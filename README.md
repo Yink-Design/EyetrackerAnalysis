@@ -1,24 +1,68 @@
 # EyeLink ASC Analyzer CN
 
-面向 EyeLink ASC 数据的 R Shiny 眼动分析工具。项目目标是替代 DataViewer 的主要指标导出流程，并针对 UE / 三维加载体验 HCI 实验提供 trial、phase、AOI、瞳孔与行为数据综合分析能力。
+面向 **EyeLink ASC / EyeLink 1000+** 数据的 R Shiny 眼动分析工具。项目目标是替代 DataViewer 的主要指标导出流程，并针对 UE / 三维加载体验 HCI 实验提供更贴合实验流程的 trial、phase、AOI、瞳孔与行为数据综合分析能力。
 
-## 当前状态
+## CodeX / Codex 接手说明
 
-当前代码按 V1–V4 目标推进，第一批提交覆盖：
+请先阅读仓库根目录下的：
 
-- ASC 解析：sample、EFIX、ESACC、EBLINK、MSG、TRIALID、TRIAL_VAR
-- trial / phase 自动识别：loading、viewer、question、progressive usable
-- 核心指标导出：trial、phase、fixation、saccade、blink、pupil timeseries
-- 中文指标字典
-- Shiny 可视化界面
-- 矩形 / 圆形 / 组合 AOI 基础支持
-- AOI 指标：dwell time、TTFF、FFD、visit count、sample proportion
-- 答题记录 CSV 合并与时间戳校验
-- CSV / XLSX / PNG 导出基础函数
+```text
+PROJECT_PLAN.md
+```
 
-视频导入与视频 gaze replay 暂未纳入当前版本。
+该文件记录了项目定位、版本规划、当前代码状态、已实现功能、已知限制、下一步开发任务和验收标准。后续开发请优先按照 `PROJECT_PLAN.md` 的任务顺序推进。
+
+当前参考 ASC 文件已经由用户手动上传到：
+
+```text
+data/demo/FM164641.asc
+```
+
+解析该文件时，可用以下期望计数作为回归测试参照：
+
+```text
+data/demo/FM164641_expected_counts.csv
+```
+
+期望值：
+
+| 项目 | 数量 / 状态 |
+|---|---:|
+| samples | 94,009 |
+| fixations | 126 |
+| saccades | 125 |
+| blinks | 17 |
+| messages | 91 |
+| trials | 2 |
+| sampling_rate | 2000 Hz |
+| eye | RIGHT |
+| display_coords | 0,0,1919,1079 |
+
+## 当前代码状态
+
+当前提交已经包含一个可继续开发的 R Shiny 原型：
+
+| 模块 | 当前状态 |
+|---|---|
+| ASC 解析 | 已写入 `R/core.R` |
+| Sample / EFIX / ESACC / EBLINK 解析 | 已写入 |
+| MSG / TRIALID / TRIAL_VAR 解析 | 已写入 |
+| Trial / Phase 自动识别 | 已写入 |
+| Loading / Viewer / Question / Progressive Usable 阶段 | 已写入 |
+| Trial / Phase / Fixation / Saccade / Blink / Pupil 报表 | 已写入 |
+| 中文指标字典 | 已写入 |
+| Shiny 可视化界面 | 已写入 `app.R` |
+| 矩形 / 圆形 / 组合 AOI | 已写入基础逻辑 |
+| AOI Report | 已写入基础逻辑 |
+| 答题 CSV 合并与时间戳检查 | 已写入基础逻辑 |
+| XLSX 导出 | 已写入基础逻辑 |
+| 热图 / 轨迹 / 时间线基础图 | 已写入 |
+
+重要：当前代码是在无 R 运行时环境下生成的，尚未完成本地实际运行测试。CodeX / Codex 的第一项任务应是进行本地 R 运行验证和修复。
 
 ## 安装依赖
+
+在 R 或 RStudio 中运行：
 
 ```r
 source("install_dependencies.R")
@@ -30,15 +74,53 @@ source("install_dependencies.R")
 shiny::runApp()
 ```
 
-## 推荐输入
+或显式指定项目目录：
+
+```r
+shiny::runApp(".")
+```
+
+## 推荐本地验证流程
+
+CodeX / Codex 接手后建议先按以下顺序验证：
+
+```r
+source("install_dependencies.R")
+source("R/core.R", encoding = "UTF-8")
+parsed <- parse_asc("data/demo/FM164641.asc")
+reports <- compute_reports(parsed)
+
+nrow(parsed$samples)
+nrow(parsed$fixations)
+nrow(parsed$saccades)
+nrow(parsed$blinks)
+nrow(parsed$messages)
+nrow(parsed$trials)
+```
+
+然后与 `data/demo/FM164641_expected_counts.csv` 对比。
+
+通过核心解析后，再运行：
+
+```r
+shiny::runApp()
+```
+
+## 输入文件
 
 ### 1. EyeLink ASC
 
-先用 SR Research `EDF2ASC` 将 EDF 转为 ASC，然后在界面上传 `.asc` 文件。
+当前 demo 文件路径：
+
+```text
+data/demo/FM164641.asc
+```
+
+正式使用时，先用 SR Research `EDF2ASC` 将 EDF 转为 ASC，再在界面上传 `.asc` 文件。
 
 ### 2. AOI CSV
 
-参考：
+模板：
 
 ```text
 data/templates/aoi_template.csv
@@ -53,7 +135,7 @@ data/templates/aoi_template.csv
 
 ### 3. 答题记录 CSV
 
-参考：
+模板：
 
 ```text
 data/templates/behavior_template.csv
@@ -82,19 +164,15 @@ participant,trial_id,condition,question_id,question_start_unix,question_submit_u
 | `merged_eye_behavior_report` | 眼动指标 + 行为表现综合表 |
 | `metric_dictionary` | 中文指标定义、公式、适用性说明 |
 
-## 测试数据
+## 当前不包含的功能
 
-测试文件 `FM164641.asc` 的期望解析结果见：
-
-```text
-data/demo/FM164641_expected_counts.csv
-```
-
-本地测试时可将完整 ASC 放入：
-
-```text
-data/demo/FM164641.asc
-```
+| 功能 | 状态 |
+|---|---|
+| 视频导入 | 暂不做，后续 V5 |
+| 视频叠加 gaze replay | 暂不做 |
+| 多边形 AOI | 暂不做，用多个矩形 / 圆形组合代替 |
+| 直接读取 EDF | 暂不做，当前优先 ASC |
+| 内置 ANOVA / LMM / SEM | 暂不做，优先导出统计前长表 |
 
 ## 注意事项
 
@@ -102,4 +180,4 @@ data/demo/FM164641.asc
 2. 多边形 AOI 暂不做，异形区域建议由多个矩形 / 圆形组合。
 3. 动态 3D AOI 建议后续由 UE 导出屏幕空间 bounding box 后再接入。
 4. 瞳孔字段按 EyeLink `PUPIL AREA` 处理，论文中建议写为 pupil size / pupil area，并进行 baseline correction。
-5. 2000 Hz ASC 可能出现同一毫秒两行 sample，程序保留 `sample_index`，不会按时间戳去重。
+5. 2000 Hz ASC 可能出现同一毫秒两行 sample，程序保留 `sample_index`，不要按时间戳去重。
