@@ -1,5 +1,67 @@
 # EyeLink ASC 眼动分析软件开发计划
 
+## 0. CodeX / Codex 接手说明
+
+本项目已经进入可继续开发的初始原型阶段。后续开发者请先完整阅读本文档，再运行仓库代码。
+
+当前参考数据文件已经由用户手动上传到：
+
+```text
+data/demo/FM164641.asc
+```
+
+该 ASC 文件是当前解析器、报表生成器、Shiny 界面和 AOI 功能的主要回归测试样例。对应期望计数文件为：
+
+```text
+data/demo/FM164641_expected_counts.csv
+```
+
+期望解析结果：
+
+| 项目 | 数量 / 状态 |
+|---|---:|
+| samples | 94,009 |
+| fixations | 126 |
+| saccades | 125 |
+| blinks | 17 |
+| messages | 91 |
+| trials | 2 |
+| sampling_rate | 2000 Hz |
+| recorded_eye | RIGHT |
+| display_coords | 0,0,1919,1079 |
+
+### CodeX / Codex 第一优先任务
+
+1. 在本地 R 环境运行 `source("install_dependencies.R")`。
+2. 运行核心解析测试：
+
+```r
+source("R/core.R", encoding = "UTF-8")
+parsed <- parse_asc("data/demo/FM164641.asc")
+reports <- compute_reports(parsed)
+
+nrow(parsed$samples)
+nrow(parsed$fixations)
+nrow(parsed$saccades)
+nrow(parsed$blinks)
+nrow(parsed$messages)
+nrow(parsed$trials)
+```
+
+3. 将结果与 `data/demo/FM164641_expected_counts.csv` 对比。
+4. 修复任何 R 语法错误、data.table 作用域错误、Shiny 启动错误。
+5. 通过核心解析后，再运行：
+
+```r
+shiny::runApp()
+```
+
+6. 验证 Shiny 页面中的上传、概览、指标说明、Trial / Phase 分析、AOI、答题合并和 XLSX 导出。
+
+重要：当前代码是在无 R 运行时环境下生成的，尚未完成本地实际运行测试。因此下一步重点不是添加新功能，而是先完成运行验证、错误修复和最小可用版本稳定化。
+
+---
+
 ## 1. 项目定位
 
 本项目计划开发一个面向 **EyeLink ASC 数据** 的本地化眼动分析工具，用于替代 DataViewer 的主要指标导出流程，并针对 UE / 三维加载体验 HCI 实验提供更贴合实验流程的 trial、phase、AOI、瞳孔与行为数据综合分析能力。
@@ -10,16 +72,57 @@
 
 ---
 
-## 2. 目标用户与使用场景
+## 2. 当前代码状态
 
-### 2.1 目标用户
+当前仓库已经包含以下文件：
+
+```text
+PROJECT_PLAN.md
+README.md
+install_dependencies.R
+global.R
+app.R
+R/core.R
+data/templates/aoi_template.csv
+data/templates/behavior_template.csv
+data/demo/FM164641.asc
+data/demo/FM164641_expected_counts.csv
+data/demo/README.md
+www/app.css
+```
+
+当前代码覆盖的功能：
+
+| 模块 | 当前状态 | 主要文件 |
+|---|---|---|
+| ASC 解析 | 已写入，待运行验证 | `R/core.R` |
+| Metadata 解析 | 已写入，待运行验证 | `R/core.R` |
+| Sample 解析 | 已写入，待运行验证 | `R/core.R` |
+| EFIX / ESACC / EBLINK 解析 | 已写入，待运行验证 | `R/core.R` |
+| MSG / TRIALID / TRIAL_VAR 解析 | 已写入，待运行验证 | `R/core.R` |
+| Trial 自动识别 | 已写入，待运行验证 | `R/core.R` |
+| Phase 自动识别 | 已写入，待运行验证 | `R/core.R` |
+| Trial / Phase 指标 | 已写入，待运行验证 | `R/core.R` |
+| Pupil time-series | 已写入，待运行验证 | `R/core.R` |
+| AOI 命中与 AOI report | 已写入基础逻辑，待运行验证 | `R/core.R` |
+| 行为 CSV 合并 | 已写入基础逻辑，待运行验证 | `R/core.R` |
+| XLSX 导出 | 已写入基础逻辑，待运行验证 | `R/core.R` |
+| Shiny 界面 | 已写入原型，待运行验证 | `app.R` |
+| 中文指标字典 | 已写入 | `R/core.R` |
+| 模板文件 | 已写入 | `data/templates/` |
+
+---
+
+## 3. 目标用户与使用场景
+
+### 3.1 目标用户
 
 - 使用 EyeLink / EyeLink 1000+ 的实验研究者
 - 需要从 EDF2ASC 转换后的 `.asc` 文件中导出论文分析指标的用户
 - 进行 HCI、用户体验、界面设计、三维交互、加载体验研究的设计学 / 交互研究人员
 - 希望减少对 DataViewer 依赖，但仍需要 AOI、trial、phase、pupil、fixation 等指标导出的用户
 
-### 2.2 典型使用场景
+### 3.2 典型使用场景
 
 1. 上传 EyeLink `.asc` 文件。
 2. 软件自动解析 sample、fixation、saccade、blink、MSG、TRIALID、trial variables。
@@ -31,7 +134,7 @@
 
 ---
 
-## 3. 当前数据基础判断
+## 4. 当前数据基础判断
 
 基于测试文件 `FM164641.asc`，当前 ASC 文件已经包含以下关键结构：
 
@@ -52,9 +155,9 @@
 
 ---
 
-## 4. 当前开发范围
+## 5. 当前开发范围
 
-### 4.1 纳入当前版本的功能
+### 5.1 纳入当前版本的功能
 
 | 功能 | 是否纳入 | 说明 |
 |---|---:|---|
@@ -77,7 +180,7 @@
 | 综合分析表导出 | 是 | 眼动指标 + 答题表现合并 |
 | 批量被试基础支持 | 是 | 支持多 ASC 合并分析 |
 
-### 4.2 暂不纳入当前版本的功能
+### 5.2 暂不纳入当前版本的功能
 
 | 功能 | 处理方式 | 原因 |
 |---|---|---|
@@ -90,9 +193,9 @@
 
 ---
 
-## 5. 技术路线
+## 6. 技术路线
 
-### 5.1 核心技术栈
+### 6.1 核心技术栈
 
 | 模块 | 建议技术 |
 |---|---|
@@ -100,49 +203,64 @@
 | GUI | Shiny |
 | 数据处理 | data.table / dplyr |
 | 可视化 | ggplot2 / plotly |
-| 图片叠加 | magick / ggplot2 / grid |
-| Excel 导出 | openxlsx 或 writexl |
+| 图片叠加 | ggplot2 / grid / magick |
+| Excel 导出 | openxlsx |
 | PNG 导出 | ggplot2::ggsave / ragg |
 | 项目保存 | RDS / JSON / CSV |
 | AOI 配置 | CSV / JSON |
 
-### 5.2 项目结构
+### 6.2 当前实际结构
 
 ```text
-EyeLinkASCAnalyzer_CN/
+EyetrackerAnalysis/
 ├─ app.R
+├─ global.R
+├─ install_dependencies.R
+├─ PROJECT_PLAN.md
+├─ README.md
 ├─ R/
-│  ├─ 01_parse_asc.R
-│  ├─ 02_extract_trials.R
-│  ├─ 03_assign_phase.R
-│  ├─ 04_metrics_core.R
-│  ├─ 05_metrics_aoi.R
-│  ├─ 06_merge_behavior.R
-│  ├─ 07_visualization.R
-│  ├─ 08_export_reports.R
-│  ├─ 09_metric_dictionary.R
-│  └─ 10_utils.R
+│  └─ core.R
 ├─ data/
 │  ├─ demo/
+│  │  ├─ FM164641.asc
+│  │  ├─ FM164641_expected_counts.csv
+│  │  └─ README.md
 │  └─ templates/
 │     ├─ aoi_template.csv
-│     ├─ behavior_template.csv
-│     └─ metric_dictionary.csv
-├─ www/
-│  └─ app.css
-├─ outputs/
-└─ README.md
+│     └─ behavior_template.csv
+└─ www/
+   └─ app.css
 ```
+
+### 6.3 后续建议重构结构
+
+当前为了快速推进，核心逻辑集中在 `R/core.R`。通过运行验证后，建议拆成：
+
+```text
+R/
+├─ 01_parse_asc.R
+├─ 02_extract_trials.R
+├─ 03_assign_phase.R
+├─ 04_metrics_core.R
+├─ 05_metrics_aoi.R
+├─ 06_merge_behavior.R
+├─ 07_visualization.R
+├─ 08_export_reports.R
+├─ 09_metric_dictionary.R
+└─ 10_utils.R
+```
+
+拆分前应确保测试文件能够完整通过解析和报表导出。
 
 ---
 
-## 6. 版本规划
+## 7. 版本规划
 
 ## V1：ASC 核心解析与指标导出版
 
 ### 目标
 
-先完成 ASC 解析、trial / phase 自动识别、核心指标计算、CSV / XLSX 导出。
+完成 ASC 解析、trial / phase 自动识别、核心指标计算、CSV / XLSX 导出。
 
 ### 功能
 
@@ -183,7 +301,7 @@ parsed$metadata
 
 ### 完成标准
 
-- 能正确解析 `FM164641.asc`
+- 能正确解析 `data/demo/FM164641.asc`
 - 能识别 T001 / T002 等 trial
 - 能识别 condition A / C 等 trial variable
 - 能识别 `LOADING_START`、`LOADING_COMPLETE`、`VIEWER_ENTER`、`QUESTION_START`、`QUESTION_SUBMIT`
@@ -222,40 +340,6 @@ parsed$metadata
 | 分 phase AOI | 支持 |
 | 分时间段 AOI | 支持 |
 
-### AOI 数据结构
-
-| 字段 | 说明 |
-|---|---|
-| `aoi_group_id` | AOI 组编号 |
-| `aoi_name` | AOI 名称 |
-| `shape_id` | 单个形状编号 |
-| `shape_type` | rectangle / circle |
-| `x_min` | 矩形左上角 x |
-| `y_min` | 矩形左上角 y |
-| `x_max` | 矩形右下角 x |
-| `y_max` | 矩形右下角 y |
-| `center_x` | 圆形 AOI 圆心 x |
-| `center_y` | 圆形 AOI 圆心 y |
-| `radius` | 圆形 AOI 半径 |
-| `trial_id` | 适用 trial，可为空 |
-| `condition` | 适用 condition，可为空 |
-| `phase` | 适用 phase，可为空 |
-| `time_start` | 适用时间起点 |
-| `time_end` | 适用时间终点 |
-| `priority` | AOI 重叠时优先级 |
-| `enabled` | 是否启用 |
-
-### 完成标准
-
-- 背景图可上传并显示
-- AOI 坐标与 EyeLink display coordinates 对齐
-- 可绘制 / 保存 / 读取矩形 AOI
-- 可绘制 / 保存 / 读取圆形 AOI
-- 多个 shape 可合并为一个 AOI group
-- 可计算 AOI dwell time、TTFF、FFD、fixation count、visit count
-- 可导出 AOI report
-- 可导出 AOI 叠加图、scanpath、heatmap、pupil curve PNG
-
 ---
 
 ## V3：答题记录合并与综合实验分析版
@@ -270,17 +354,6 @@ parsed$metadata
 participant,trial_id,condition,question_id,question_start_unix,question_submit_unix,response_time_ms,selected_answer,correct_answer,accuracy
 ```
 
-### 功能
-
-- 上传 behavior CSV
-- 自动检查 participant / trial / condition / question_id
-- 对比 ASC 中的 `QUESTION_START` 与 `QUESTION_SUBMIT`
-- 检查 response time 是否一致
-- 计算时间戳误差
-- 生成 mismatch report
-- 合并眼动指标与答题表现
-- 导出综合分析表
-
 ### 输出表
 
 | 表名 | 内容 |
@@ -288,12 +361,6 @@ participant,trial_id,condition,question_id,question_start_unix,question_submit_u
 | `behavior_check_report.csv` | trial / question / 时间戳匹配检查 |
 | `merged_eye_behavior_report.csv` | 眼动指标 + accuracy + RT |
 | `condition_summary.csv` | 按 condition 汇总的行为与眼动指标 |
-
-### 完成标准
-
-- 能识别行为 CSV 与 ASC 的 trial 对应关系
-- 能提示缺失、重复、condition 不一致、时间戳偏差过大等问题
-- 能输出适合统计建模的长表
 
 ---
 
@@ -314,13 +381,6 @@ participant,trial_id,condition,question_id,question_start_unix,question_submit_u
 - 输出日志文件
 - 指标字典随报表一起导出
 
-### 完成标准
-
-- 多被试数据不会混淆 participant / trial / condition
-- 所有导出表为长表格式，适合 R / SPSS / JASP / Jamovi
-- 项目重新打开后可以恢复 AOI、文件配置与分析参数
-- 批量导出结构稳定
-
 ---
 
 ## V5：视频扩展版（后续，不纳入当前开发）
@@ -329,23 +389,15 @@ participant,trial_id,condition,question_id,question_start_unix,question_submit_u
 
 支持视频导入、视频起点时间对齐、gaze 轨迹叠加、视频截图上热图与轨迹导出。
 
-### 前提
-
-需要解决视频时间基准问题，例如：
-
-- 视频 0 秒对应 ASC 中某个 EVENT
-- 视频 0 秒对应 UE unix / bjt 时间戳
-- 用户手动输入 offset
-
 ### 暂缓原因
 
 视频同步精度依赖实验记录流程，不适合作为当前核心开发目标。
 
 ---
 
-## 7. 指标体系
+## 8. 指标体系
 
-## 7.1 数据质量指标
+## 8.1 数据质量指标
 
 | 英文名 | 中文名 | 定义 | 是否适合加载体验研究 |
 |---|---|---|---:|
@@ -355,7 +407,7 @@ participant,trial_id,condition,question_id,question_start_unix,question_submit_u
 | Calibration Error | 校准误差 | validation 平均误差和最大误差 | 是，用于报告数据质量 |
 | Recording Duration | 记录总时长 | recording start 到 stop 的时长 | 是，用于流程检查 |
 
-## 7.2 Trial / Phase 指标
+## 8.2 Trial / Phase 指标
 
 | 英文名 | 中文名 | 定义 | 是否适合加载体验研究 |
 |---|---|---|---:|
@@ -366,7 +418,7 @@ participant,trial_id,condition,question_id,question_start_unix,question_submit_u
 | Progressive Usable Duration | 渐进可用阶段时长 | PROGRESSIVE_USABLE 到 LOADING_COMPLETE | 是，适合 C 条件 |
 | Phase-specific Metrics | 分阶段眼动指标 | 在 loading / viewer / question 内分别计算指标 | 是，核心分析方式 |
 
-## 7.3 Fixation 指标
+## 8.3 Fixation 指标
 
 | 英文名 | 中文名 | 定义 | 是否适合加载体验研究 |
 |---|---|---|---:|
@@ -376,7 +428,7 @@ participant,trial_id,condition,question_id,question_start_unix,question_submit_u
 | Fixation Rate | 注视频率 | fixation count / 阶段时长 | 是 |
 | First Fixation Latency | 首次注视潜伏期 | 阶段开始到第一次 fixation 的时间 | 一般，结合 AOI 更有价值 |
 
-## 7.4 AOI 指标
+## 8.4 AOI 指标
 
 | 英文名 | 中文名 | 定义 | 是否适合加载体验研究 |
 |---|---|---|---:|
@@ -388,7 +440,7 @@ participant,trial_id,condition,question_id,question_start_unix,question_submit_u
 | AOI Sample Proportion | AOI 采样占比 | AOI 内有效 sample / 阶段内有效 sample | 是 |
 | AOI Transition | AOI 转移路径 | AOI 之间的注视转移顺序 | 是，辅助解释注意路径 |
 
-## 7.5 Saccade 指标
+## 8.5 Saccade 指标
 
 | 英文名 | 中文名 | 定义 | 是否适合加载体验研究 |
 |---|---|---|---:|
@@ -398,7 +450,7 @@ participant,trial_id,condition,question_id,question_start_unix,question_submit_u
 | Peak Velocity | 峰值速度 | saccade 最大速度 | 辅助指标 |
 | Saccade Rate | 眼跳频率 | saccade count / 阶段时长 | 是 |
 
-## 7.6 Blink 指标
+## 8.6 Blink 指标
 
 | 英文名 | 中文名 | 定义 | 是否适合加载体验研究 |
 |---|---|---|---:|
@@ -407,7 +459,7 @@ participant,trial_id,condition,question_id,question_start_unix,question_submit_u
 | Total Blink Duration | 总眨眼时长 | blink duration 总和 | 是，质量与注意状态参考 |
 | Mean Blink Duration | 平均眨眼时长 | blink duration 平均值 | 辅助指标 |
 
-## 7.7 Pupil 指标
+## 8.7 Pupil 指标
 
 | 英文名 | 中文名 | 定义 | 是否适合加载体验研究 |
 |---|---|---|---:|
@@ -418,7 +470,7 @@ participant,trial_id,condition,question_id,question_start_unix,question_submit_u
 | Time to Peak Pupil | 峰值出现时间 | 阶段开始到最大瞳孔变化的时间 | 是 |
 | Pupil Slope | 瞳孔变化斜率 | pupil 随时间变化的线性趋势 | 是 |
 
-## 7.8 Time-bin 指标
+## 8.8 Time-bin 指标
 
 | 英文名 | 中文名 | 定义 | 是否适合加载体验研究 |
 |---|---|---|---:|
@@ -429,9 +481,9 @@ participant,trial_id,condition,question_id,question_start_unix,question_submit_u
 
 ---
 
-## 8. 关键算法规则
+## 9. 关键算法规则
 
-### 8.1 Phase 识别规则
+### 9.1 Phase 识别规则
 
 | Phase | 起点 | 终点 |
 |---|---|---|
@@ -449,7 +501,7 @@ participant,trial_id,condition,question_id,question_start_unix,question_submit_u
 | 缺少 QUESTION_SUBMIT | 标记为 incomplete |
 | phase 重叠 | 优先使用更具体阶段，例如 question 高于 viewer |
 
-### 8.2 AOI 命中规则
+### 9.2 AOI 命中规则
 
 矩形 AOI：
 
@@ -477,7 +529,7 @@ AOI 重叠处理：
 - 默认保留多个 AOI 标签。
 - 若用户设置 priority，则优先采用高优先级 AOI。
 
-### 8.3 Dwell Time 计算
+### 9.3 Dwell Time 计算
 
 | 类型 | 定义 | 推荐用途 |
 |---|---|---|
@@ -486,7 +538,7 @@ AOI 重叠处理：
 
 默认使用 fixation-based dwell，同时允许用户切换 sample-based dwell。
 
-### 8.4 Pupil baseline
+### 9.4 Pupil baseline
 
 可选基线：
 
@@ -508,15 +560,15 @@ pupil_z
 
 ---
 
-## 9. 导出设计
+## 10. 导出设计
 
-### 9.1 CSV 导出
+### 10.1 CSV 导出
 
 - 每张报表单独导出为 CSV。
 - 所有时间字段保留 EyeLink time 与相对 trial time。
 - 若存在 UE unix / bjt，则同时保留绝对时间字段。
 
-### 9.2 XLSX 导出
+### 10.2 XLSX 导出
 
 `all_reports.xlsx` 默认包含以下 sheets：
 
@@ -536,7 +588,7 @@ merged_eye_behavior_report
 metric_dictionary
 ```
 
-### 9.3 PNG 导出
+### 10.3 PNG 导出
 
 支持导出：
 
@@ -552,101 +604,91 @@ metric_dictionary
 
 ---
 
-## 10. 开发任务拆分
+## 11. 当前开发任务拆分
 
-### Step 1：核心解析器
+### Step 1：核心运行验证（最高优先级）
 
-- [ ] 读取 ASC 原始文本
-- [ ] 解析 metadata
-- [ ] 解析 DISPLAY_COORDS
-- [ ] 解析 samples
-- [ ] 解析 EFIX
-- [ ] 解析 ESACC
-- [ ] 解析 EBLINK
-- [ ] 解析 MSG
-- [ ] 解析 TRIALID
-- [ ] 解析 `!V TRIAL_VAR`
-- [ ] 生成 parsed object
+- [ ] 安装依赖并确认 R 包可加载
+- [ ] 运行 `source("R/core.R")`
+- [ ] 运行 `parse_asc("data/demo/FM164641.asc")`
+- [ ] 与 `FM164641_expected_counts.csv` 对比
+- [ ] 修复 R 语法错误
+- [ ] 修复 data.table 作用域错误
+- [ ] 修复 phase / trial 归属错误
+- [ ] 确认 sample 不因 2000 Hz 重复时间戳被去重
 
-### Step 2：trial / phase 识别
+### Step 2：核心指标计算验证
 
-- [ ] 根据 TRIALID 生成 trial table
-- [ ] 提取 participant / condition / exhibit
-- [ ] 根据 MSG 识别 loading phase
-- [ ] 根据 MSG 识别 viewer phase
-- [ ] 根据 MSG 识别 question phase
-- [ ] 根据 MSG 识别 progressive usable phase
-- [ ] 将 sample / fixation / saccade / blink 归属到 trial 与 phase
+- [ ] 验证 `metadata_report`
+- [ ] 验证 `quality_report`
+- [ ] 验证 `trial_report`
+- [ ] 验证 `phase_report`
+- [ ] 验证 `fixation_report`
+- [ ] 验证 `saccade_report`
+- [ ] 验证 `blink_report`
+- [ ] 验证 `pupil_timeseries`
+- [ ] 验证 `export_xlsx`
 
-### Step 3：核心指标计算
+### Step 3：Shiny 界面验证
 
-- [ ] 数据质量指标
-- [ ] trial report
-- [ ] phase report
-- [ ] fixation report
-- [ ] saccade report
-- [ ] blink report
-- [ ] pupil timeseries
-- [ ] time-bin report
-- [ ] baseline-corrected pupil
+- [ ] 运行 `shiny::runApp()`
+- [ ] 上传 demo ASC
+- [ ] 查看数据概览
+- [ ] 查看指标说明
+- [ ] 查看事件时间线
+- [ ] 查看 scanpath
+- [ ] 查看 heatmap
+- [ ] 导出 XLSX
+- [ ] 修复 Shiny reactive / UI 错误
 
-### Step 4：Shiny 基础界面
+### Step 4：AOI 功能验证
 
-- [ ] 数据导入页
-- [ ] 数据概览页
-- [ ] 指标说明页
-- [ ] Trial / Phase 分析页
-- [ ] 导出页
-- [ ] 中文错误提示
+- [ ] 上传 `data/templates/aoi_template.csv`
+- [ ] 验证矩形 AOI 命中
+- [ ] 验证圆形 AOI 命中
+- [ ] 验证组合 AOI group
+- [ ] 验证 fixation-based dwell
+- [ ] 验证 sample-based dwell
+- [ ] 验证 TTFF / FFD / visit count
+- [ ] 验证 AOI report 导出
 
-### Step 5：AOI 功能
+### Step 5：答题记录合并验证
 
-- [ ] 上传背景图
-- [ ] 显示背景图与坐标
-- [ ] 绘制矩形 AOI
-- [ ] 绘制圆形 AOI
-- [ ] AOI group 管理
-- [ ] AOI phase / time range 设置
-- [ ] AOI 命中计算
-- [ ] AOI report
-- [ ] AOI 可视化图导出
+- [ ] 上传 `data/templates/behavior_template.csv`
+- [ ] 验证 trial / question 匹配
+- [ ] 验证 unix 时间戳差值
+- [ ] 输出 `behavior_check_report`
+- [ ] 输出 `merged_eye_behavior_report`
 
-### Step 6：行为数据合并
+### Step 6：结构重构与稳定化
 
-- [ ] 上传 behavior CSV
-- [ ] 字段检查
-- [ ] trial 匹配
-- [ ] question 匹配
-- [ ] 时间戳误差检查
-- [ ] mismatch report
-- [ ] merged eye-behavior report
-
-### Step 7：批量处理与稳定化
-
-- [ ] 多 ASC 批量导入
-- [ ] 多被试合并
-- [ ] AOI 配置保存 / 读取
-- [ ] 项目配置保存 / 读取
-- [ ] 批量导出 CSV / XLSX / PNG
-- [ ] 输出运行日志
-- [ ] README 和使用说明
+- [ ] 将 `R/core.R` 拆分成多个模块
+- [ ] 添加基本单元测试或回归测试脚本
+- [ ] 添加 `.gitignore`
+- [ ] 添加 `outputs/.gitkeep`
+- [ ] 增加错误提示中文化
+- [ ] 增加批量 ASC 处理
+- [ ] 增加项目保存 / 读取
 
 ---
 
-## 11. 验收标准
+## 12. 验收标准
 
-### 11.1 数据解析验收
+### 12.1 数据解析验收
 
-使用 `FM164641.asc` 测试时，应满足：
+使用 `data/demo/FM164641.asc` 测试时，应满足：
 
-- 能识别 sample 数据
-- 能识别 fixation / saccade / blink
-- 能识别 MSG marker
-- 能识别 trial
-- 能识别 condition
-- 能识别 loading / viewer / question / progressive usable phase
+- samples = 94,009
+- fixations = 126
+- saccades = 125
+- blinks = 17
+- messages = 91
+- trials = 2
+- sampling_rate = 2000 Hz
+- eye = RIGHT
+- display_coords = 0,0,1919,1079
 
-### 11.2 指标导出验收
+### 12.2 指标导出验收
 
 - 所有报告可导出 CSV
 - 所有报告可汇总导出 XLSX
@@ -654,7 +696,7 @@ metric_dictionary
 - fixation / saccade / blink 数量与 ASC 事件数量一致
 - pupil 指标只使用有效 sample
 
-### 11.3 AOI 验收
+### 12.3 AOI 验收
 
 - 背景图坐标与 DISPLAY_COORDS 对齐
 - 矩形 AOI 命中计算正确
@@ -663,7 +705,7 @@ metric_dictionary
 - AOI 可绑定 trial / phase / time range
 - AOI report 可导出
 
-### 11.4 行为数据合并验收
+### 12.4 行为数据合并验收
 
 - 能上传 behavior CSV
 - 能匹配 participant、trial、condition、question
@@ -672,24 +714,25 @@ metric_dictionary
 
 ---
 
-## 12. 当前优先级
+## 13. 当前优先级
 
 当前优先开发顺序：
 
-1. ASC 解析器
-2. trial / phase 识别
-3. 核心指标导出
-4. Shiny 基础界面
-5. 中文指标说明
-6. AOI 计算逻辑
-7. 背景图与 AOI 绘制
-8. PNG / XLSX 导出
-9. 答题 CSV 合并
-10. 批量处理与项目保存
+1. 本地运行验证与错误修复
+2. 核心解析器稳定化
+3. trial / phase 识别准确性验证
+4. 核心指标导出验证
+5. Shiny 基础界面修复
+6. 中文指标说明完善
+7. AOI 计算逻辑验证
+8. 背景图与 AOI 绘制体验优化
+9. PNG / XLSX 导出完善
+10. 答题 CSV 合并验证
+11. 批量处理与项目保存
 
 ---
 
-## 13. 项目边界
+## 14. 项目边界
 
 本项目当前阶段的重点不是完整复制 DataViewer 的全部交互体验，而是实现以下目标：
 
