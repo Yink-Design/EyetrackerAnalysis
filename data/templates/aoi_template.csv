@@ -1,0 +1,3 @@
+aoi_group_id,aoi_name,shape_id,shape_type,x_min,y_min,x_max,y_max,center_x,center_y,radius,participant,trial_id,condition,phase,time_start,time_end,priority,enabled
+loading_card,加载卡片,loading_card_rect1,rectangle,600,760,1320,980,,,,,T001,A,loading,,,1,TRUE
+model_area,展品区域,model_area_circle1,circle,,,,,960,540,260,,T001,A,viewer,,,1,TRUE
