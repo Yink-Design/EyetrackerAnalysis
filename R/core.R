@@ -40,20 +40,31 @@ empty_dt <- function(cols) {
   dt
 }
 
-parse_asc <- function(file, keep_samples = TRUE) {
+parse_asc <- function(file, keep_samples = TRUE, progress = NULL) {
   need_pkg("data.table")
+  if (is.function(progress)) progress("读取 ASC 文本", 0.02)
   lines <- readLines(file, warn = FALSE, encoding = "UTF-8")
+  if (is.function(progress)) progress("解析 metadata", 0.08)
   metadata <- parse_metadata(lines, file)
+  if (is.function(progress)) progress("解析 MSG / TRIALID / TRIAL_VAR", 0.14)
   messages <- parse_messages(lines)
-  samples <- if (keep_samples) parse_samples(lines) else empty_dt(c("sample_index", "time", "gaze_x", "gaze_y", "pupil", "valid_gaze", "valid_pupil"))
+  if (is.function(progress)) progress("解析 gaze samples", 0.20)
+  samples <- if (keep_samples) parse_samples(lines, progress = function(value) {
+    if (is.function(progress)) progress(sprintf("解析 gaze samples %.0f%%", value * 100), 0.20 + value * 0.42)
+  }) else empty_dt(c("sample_index", "time", "gaze_x", "gaze_y", "pupil", "valid_gaze", "valid_pupil"))
+  if (is.function(progress)) progress("解析 EFIX / ESACC / EBLINK", 0.66)
   fixations <- parse_fixations(lines)
   saccades <- parse_saccades(lines)
   blinks <- parse_blinks(lines)
   parsed <- list(metadata = metadata, messages = messages, samples = samples, fixations = fixations, saccades = saccades, blinks = blinks)
+  if (is.function(progress)) progress("构建 trial", 0.76)
   parsed <- build_trials(parsed)
+  if (is.function(progress)) progress("构建 phase", 0.84)
   parsed <- build_phases(parsed)
+  if (is.function(progress)) progress("归属 trial / phase", 0.92)
   parsed <- assign_trial_phase(parsed)
   parsed$metadata$participant <- first_non_na(parsed$trials$participant, parsed$metadata$participant)
+  if (is.function(progress)) progress("ASC 解析完成", 1)
   parsed
 }
 
@@ -118,15 +129,23 @@ parse_messages <- function(lines) {
   data.table::rbindlist(out, fill = TRUE)
 }
 
-parse_samples <- function(lines) {
+parse_samples <- function(lines, progress = NULL) {
   need_pkg("data.table")
   idx <- grep("^\\s*[0-9]+\\s+", lines)
   if (length(idx) == 0) return(empty_dt(c("sample_index", "time", "gaze_x", "gaze_y", "pupil", "valid_gaze", "valid_pupil")))
-  out <- lapply(seq_along(idx), function(k) {
-    p <- strsplit(trimws(lines[idx[k]]), "\\s+")[[1]]
-    if (length(p) < 4) return(NULL)
-    data.table::data.table(sample_index = k, time = as_num(p[1]), gaze_x = as_num(p[2]), gaze_y = as_num(p[3]), pupil = as_num(p[4]))
-  })
+  chunk_size <- 50000L
+  starts <- seq.int(1L, length(idx), by = chunk_size)
+  out <- vector("list", length(starts))
+  for (chunk_id in seq_along(starts)) {
+    chunk_seq <- starts[[chunk_id]]:min(starts[[chunk_id]] + chunk_size - 1L, length(idx))
+    out[[chunk_id]] <- lapply(chunk_seq, function(k) {
+      p <- strsplit(trimws(lines[idx[k]]), "\\s+")[[1]]
+      if (length(p) < 4) return(NULL)
+      data.table::data.table(sample_index = k, time = as_num(p[1]), gaze_x = as_num(p[2]), gaze_y = as_num(p[3]), pupil = as_num(p[4]))
+    })
+    if (is.function(progress)) progress(max(chunk_seq) / length(idx))
+  }
+  out <- unlist(out, recursive = FALSE)
   dt <- data.table::rbindlist(out, fill = TRUE)
   dt[, valid_gaze := !is.na(gaze_x) & !is.na(gaze_y)]
   dt[, valid_pupil := !is.na(pupil)]
@@ -385,7 +404,7 @@ export_xlsx <- function(reports, file) {
 plot_timeline <- function(parsed, trial_id = "") {
   need_pkg("ggplot2")
   ph <- parsed$phases; ev <- parsed$events
-  if (nzchar(trial_id)) { ph <- ph[trial_id == !!trial_id]; ev <- ev[trial_id == !!trial_id] }
+  if (nzchar(trial_id)) { ph <- ph[ph$trial_id == trial_id]; ev <- ev[ev$trial_id == trial_id] }
   if (nrow(ph) == 0) return(ggplot2::ggplot() + ggplot2::ggtitle("无 phase 数据"))
   t0 <- min(ph$start_time); ph[, `:=`(rel_start = (start_time - t0) / 1000, rel_end = (end_time - t0) / 1000)]; ev[, rel_time := (time - t0) / 1000]
   ggplot2::ggplot() + ggplot2::geom_segment(data = ph, ggplot2::aes(x = rel_start, xend = rel_end, y = phase_instance, yend = phase_instance, linewidth = phase)) + ggplot2::geom_point(data = ev, ggplot2::aes(x = rel_time, y = event_name), size = 1.8) + ggplot2::labs(x = "相对时间 / 秒", y = "事件 / 阶段", title = "事件时间线") + ggplot2::theme_minimal()
@@ -394,8 +413,8 @@ plot_timeline <- function(parsed, trial_id = "") {
 plot_scanpath <- function(parsed, trial_id = "", phase = "") {
   need_pkg("ggplot2")
   fx <- parsed$fixations
-  if (nzchar(trial_id)) fx <- fx[trial_id == !!trial_id]
-  if (nzchar(phase)) fx <- fx[phase == !!phase]
+  if (nzchar(trial_id)) fx <- fx[fx$trial_id == trial_id]
+  if (nzchar(phase)) fx <- fx[fx$phase == phase]
   dc <- parsed$metadata$display_coords
   if (nrow(fx) == 0) return(ggplot2::ggplot() + ggplot2::ggtitle("无注视数据"))
   fx[, order_id := seq_len(.N)]
@@ -405,9 +424,123 @@ plot_scanpath <- function(parsed, trial_id = "", phase = "") {
 plot_heatmap <- function(parsed, trial_id = "", phase = "") {
   need_pkg("ggplot2")
   sm <- parsed$samples[valid_gaze == TRUE]
-  if (nzchar(trial_id)) sm <- sm[trial_id == !!trial_id]
-  if (nzchar(phase)) sm <- sm[phase == !!phase]
+  if (nzchar(trial_id)) sm <- sm[sm$trial_id == trial_id]
+  if (nzchar(phase)) sm <- sm[sm$phase == phase]
   dc <- parsed$metadata$display_coords
   if (nrow(sm) == 0) return(ggplot2::ggplot() + ggplot2::ggtitle("无 gaze sample 数据"))
   ggplot2::ggplot(sm, ggplot2::aes(x = gaze_x, y = gaze_y)) + ggplot2::stat_density_2d(ggplot2::aes(fill = ggplot2::after_stat(level)), geom = "polygon", alpha = .45, bins = 12) + ggplot2::coord_fixed(xlim = c(dc[["x_min"]], dc[["x_max"]]), ylim = c(dc[["y_max"]], dc[["y_min"]])) + ggplot2::labs(title = "Heatmap / 眼动热区", x = "x", y = "y") + ggplot2::theme_minimal() + ggplot2::theme(legend.position = "none")
+}
+
+metric_dictionary <- function() {
+  data.table::data.table(
+    category = c(
+      "数据质量","数据质量","数据质量","数据质量",
+      "Trial/Phase","Trial/Phase","Trial/Phase","Trial/Phase",
+      "注视","注视","注视",
+      "AOI","AOI","AOI","AOI","AOI","AOI",
+      "眼跳","眼跳","眼跳","眼跳",
+      "眨眼","眨眼","眨眼",
+      "瞳孔","瞳孔","瞳孔","瞳孔",
+      "时间序列","行为合并"
+    ),
+    metric = c(
+      "sample_count","valid_sample_rate","missing_data_rate","validation_avg_error",
+      "duration_ms","fixation_count","first_fixation_latency","baseline_corrected_pupil_area",
+      "mean_fixation_duration","total_fixation_duration","fixation_rate_per_sec",
+      "dwell_time_ms","ttff_ms","first_fixation_duration_ms","visit_count","aoi_sample_proportion","mean_pupil_in_aoi",
+      "saccade_count","mean_saccade_amplitude","total_scanpath_length","saccade_rate_per_sec",
+      "blink_count","blink_rate_per_sec","total_blink_duration",
+      "mean_pupil_area","peak_pupil_dilation","pupil_slope_per_sec","baseline_pupil_area",
+      "timebin_mean_pupil","accuracy"
+    ),
+    cn_name = c(
+      "采样点数","有效采样率","缺失率","平均校准误差",
+      "阶段/试次时长","注视次数","首次注视潜伏期","基线校正瞳孔",
+      "平均注视时长","总注视时长","注视频率",
+      "AOI 停留时间","首次看向 AOI 时间","AOI 首次注视时长","AOI 访问次数","AOI 采样占比","AOI 内平均瞳孔",
+      "眼跳次数","平均眼跳幅度","扫视路径总长度","眼跳频率",
+      "眨眼次数","眨眼频率","总眨眼时长",
+      "平均瞳孔面积","峰值瞳孔扩张","瞳孔变化斜率","基线瞳孔面积",
+      "分箱平均瞳孔","正确率"
+    ),
+    report_table = c(
+      "quality_report / trial_report / phase_report","quality_report / trial_report / phase_report","quality_report / trial_report / phase_report","metadata / quality_report",
+      "trial_report / phase_report","trial_report / phase_report / fixation_report","trial_report / phase_report","trial_report / phase_report / pupil_timeseries",
+      "fixation_report / trial_report / phase_report","trial_report / phase_report","trial_report / phase_report",
+      "aoi_report","aoi_report","aoi_report","aoi_report","aoi_report","aoi_report",
+      "saccade_report / trial_report / phase_report","saccade_report / trial_report / phase_report","trial_report / phase_report","trial_report / phase_report",
+      "blink_report / trial_report / phase_report","trial_report / phase_report","trial_report / phase_report",
+      "trial_report / phase_report / pupil_timeseries","trial_report / phase_report","trial_report / phase_report","trial_report / phase_report",
+      "pupil_timeseries","merged_eye_behavior_report / condition_summary"
+    ),
+    ui_location = c(
+      "数据概览、导出","数据概览、Trial / Phase 分析、导出","数据概览、Trial / Phase 分析、导出","数据概览、导出",
+      "Trial / Phase 分析","Trial / Phase 分析、原始报表","Trial / Phase 分析","Trial / Phase 分析、瞳孔曲线、导出",
+      "原始报表、Trial / Phase 分析","Trial / Phase 分析","Trial / Phase 分析",
+      "AOI 分析","AOI 分析","AOI 分析","AOI 分析","AOI 分析","AOI 分析",
+      "原始报表、Trial / Phase 分析","原始报表、Trial / Phase 分析","Trial / Phase 分析","Trial / Phase 分析",
+      "原始报表、Trial / Phase 分析","Trial / Phase 分析","Trial / Phase 分析",
+      "Trial / Phase 分析","Trial / Phase 分析","Trial / Phase 分析","Trial / Phase 分析",
+      "Trial / Phase 分析、导出","答题合并"
+    ),
+    definition = c(
+      "ASC 中逐行解析出的 sample 数量。","有效 gaze 与 pupil sample 占全部 sample 的比例。","无效或缺失 sample 的比例。","EyeLink validation 平均误差，用于质量控制。",
+      "trial 或 phase 起点到终点的时间差。","当前 trial/phase 内 EFIX 数量。","阶段开始到第一次 fixation 的时间。","当前 pupil area 减去该阶段基线 pupil area 后的均值。",
+      "当前范围内 fixation duration 平均值。","当前范围内 fixation duration 总和。","fixation count / duration_sec。",
+      "落入 AOI 的 fixation 或 sample 累计时长，取决于 AOI 方法。","phase 开始到第一次落入 AOI fixation 的时间。","第一次落入 AOI 的 fixation duration。","连续进入同一 AOI 算一次 visit。","AOI 内 sample 数 / phase 内 sample 数。","落在 AOI 内 sample 的 pupil 均值。",
+      "当前范围内 ESACC 数量。","当前范围内 saccade amplitude 平均值。","当前范围内 saccade amplitude 总和。","saccade count / duration_sec。",
+      "当前范围内 EBLINK 数量。","blink count / duration_sec。","当前范围内 blink duration 总和。",
+      "有效 pupil sample 的均值。","相对基线的最大 pupil change。","pupil change 对时间的线性斜率。","阶段前或阶段初始窗口估计的 pupil baseline。",
+      "按固定 time-bin 汇总的平均 pupil area。","行为 CSV 中的正确率，可与 trial/phase 指标合并。"
+    ),
+    loading_hci_use = c(
+      "数据完整性检查。","剔除低质量数据的依据。","判断追踪中断或眨眼较多的时段。","报告校准质量。",
+      "加载、查看、答题阶段的基础时长指标。","注意投入和视觉搜索强度。","进入阶段后多快开始稳定注视。","等待压力、认知负荷和生理反应参考。",
+      "认知加工深度参考。","总体注意投入。","单位时间内注视活跃度。",
+      "AOI 关注程度核心指标。","目标区域是否被快速注意。","首次处理深度。","回看/访问行为。","时间精度更高的 AOI 占比。","AOI 相关生理反应。",
+      "视觉搜索活跃度。","眼跳幅度变化。","视觉探索总量。","单位时间探索活跃度。",
+      "注意、疲劳和数据质量参考。","单位时间眨眼情况。","缺失/闭眼总时长参考。",
+      "瞳孔基础水平。","最大负荷响应。","过程趋势。","用于校正个体差异。",
+      "观察加载过程中的瞳孔曲线。","与眼动指标合并，解释行为表现。"
+    )
+  )
+}
+
+merge_eye_behavior_report <- function(reports, behavior) {
+  if (is.null(behavior) || nrow(behavior) == 0 || is.null(reports$phase_report)) return(data.table::data.table())
+  b <- data.table::as.data.table(behavior)
+  phase_report <- data.table::copy(reports$phase_report)
+  phase_question <- phase_report[phase == "question"]
+  if (nrow(phase_question) == 0) phase_question <- phase_report
+  keys <- intersect(c("participant", "trial_id", "condition", "question_id"), names(b))
+  if (length(keys) == 0) return(data.table::data.table())
+  merge(phase_question, b, by = keys, all.x = TRUE, allow.cartesian = TRUE)
+}
+
+condition_summary <- function(merged) {
+  if (is.null(merged) || nrow(merged) == 0 || !"condition" %in% names(merged)) return(data.table::data.table())
+  dt <- data.table::as.data.table(merged)
+  dt[, .(
+    n_rows = .N,
+    mean_accuracy = safe_mean(accuracy),
+    mean_response_time_ms = safe_mean(response_time_ms),
+    mean_duration_ms = safe_mean(duration_ms),
+    mean_fixation_count = safe_mean(fixation_count),
+    mean_total_fixation_duration = safe_mean(total_fixation_duration),
+    mean_baseline_corrected_pupil_area = safe_mean(baseline_corrected_pupil_area),
+    mean_saccade_count = safe_mean(saccade_count),
+    mean_blink_count = safe_mean(blink_count)
+  ), by = condition]
+}
+
+combine_report_lists <- function(report_lists) {
+  if (length(report_lists) == 0) return(list())
+  all_names <- unique(unlist(lapply(report_lists, names)))
+  out <- list()
+  for (nm in all_names) {
+    pieces <- lapply(report_lists, function(x) x[[nm]])
+    pieces <- pieces[vapply(pieces, is.data.frame, logical(1))]
+    if (length(pieces) > 0) out[[nm]] <- data.table::rbindlist(pieces, fill = TRUE)
+  }
+  out
 }
