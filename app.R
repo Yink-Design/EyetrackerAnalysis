@@ -118,6 +118,54 @@ safe_pupil_curve <- function(reports, trial_id = "", phase = "") {
     theme_minimal()
 }
 
+time_in_windows <- function(time, windows) {
+  if (is.null(windows) || nrow(windows) == 0) return(rep(FALSE, length(time)))
+  hit <- rep(FALSE, length(time))
+  for (i in seq_len(nrow(windows))) hit <- hit | (time >= windows$start_time[i] & time < windows$end_time[i])
+  hit
+}
+
+event_in_windows <- function(start_time, end_time, windows) {
+  if (is.null(windows) || nrow(windows) == 0) return(rep(FALSE, length(start_time)))
+  hit <- rep(FALSE, length(start_time))
+  for (i in seq_len(nrow(windows))) hit <- hit | interval_overlaps(start_time, end_time, windows$start_time[i], windows$end_time[i])
+  hit
+}
+
+filtered_analysis <- function(parsed, reports, trial_value = "", phase_value = "") {
+  trial_value <- trial_value %||% ""
+  phase_value <- phase_value %||% ""
+  p <- parsed
+  p$phases <- copy(parsed$phases)
+  p$events <- copy(parsed$events)
+  p$samples <- copy(parsed$samples)
+  p$fixations <- copy(parsed$fixations)
+  if (nzchar(trial_value)) {
+    p$phases <- p$phases[p$phases$trial_id == trial_value]
+    p$events <- p$events[p$events$trial_id == trial_value]
+    p$samples <- p$samples[p$samples$trial_id == trial_value]
+    p$fixations <- p$fixations[p$fixations$trial_id == trial_value]
+  }
+  if (nzchar(phase_value)) {
+    p$phases <- p$phases[p$phases$phase == phase_value]
+    p$events <- p$events[time_in_windows(p$events$time, p$phases)]
+    p$samples <- p$samples[time_in_windows(p$samples$time, p$phases)]
+    p$fixations <- p$fixations[event_in_windows(p$fixations$start_time, p$fixations$end_time, p$phases)]
+  }
+  rep <- reports
+  if (length(rep) > 0) {
+    for (nm in names(rep)) {
+      if (is.data.frame(rep[[nm]])) {
+        dt <- copy(as.data.table(rep[[nm]]))
+        if (nzchar(trial_value) && "trial_id" %in% names(dt)) dt <- dt[dt$trial_id == trial_value]
+        if (nzchar(phase_value) && "phase" %in% names(dt)) dt <- dt[dt$phase == phase_value]
+        rep[[nm]] <- dt
+      }
+    }
+  }
+  list(parsed = p, reports = rep)
+}
+
 workflow_table <- function() {
   data.table(
     step = c("1 导入数据", "2 数据概览", "3 指标说明", "4 Trial / Phase", "5 AOI", "6 答题合并", "7 导出"),
@@ -284,6 +332,11 @@ server <- function(input, output, session) {
     if (identical(x, "__all__")) "" else x
   })
 
+  analysis_view <- reactive({
+    req(active_parsed(), current_reports())
+    filtered_analysis(active_parsed(), current_reports(), selected_trial(), selected_phase())
+  })
+
   filtered_table <- function(x, use_phase = TRUE) {
     if (is.null(x) || !is.data.frame(x) || nrow(x) == 0) return(x)
     dt <- data.table::copy(data.table::as.data.table(x))
@@ -340,14 +393,14 @@ server <- function(input, output, session) {
   output$metadata_tbl <- render_report("metadata")
   output$quality_tbl <- render_report("quality_report")
   output$trial_report_tbl <- renderDT({
-    rep <- current_reports()
+    rep <- analysis_view()$reports
     req(rep$trial_report)
-    datatable(filtered_table(rep$trial_report, use_phase = FALSE), filter = "top", rownames = FALSE, options = list(scrollX = TRUE, pageLength = 12))
+    datatable(rep$trial_report, filter = "top", rownames = FALSE, options = list(scrollX = TRUE, pageLength = 12))
   })
   output$phase_report_tbl <- renderDT({
-    rep <- current_reports()
+    rep <- analysis_view()$reports
     req(rep$phase_report)
-    datatable(filtered_table(rep$phase_report, use_phase = TRUE), filter = "top", rownames = FALSE, options = list(scrollX = TRUE, pageLength = 12))
+    datatable(rep$phase_report, filter = "top", rownames = FALSE, options = list(scrollX = TRUE, pageLength = 12))
   })
   output$metric_tbl <- render_report("metric_dictionary")
   output$fix_tbl <- render_report("fixation_report", 800)
@@ -359,30 +412,31 @@ server <- function(input, output, session) {
   output$phases_tbl <- renderDT({ req(active_parsed()); datatable(active_parsed()$phases, filter = "top", rownames = FALSE, options = list(scrollX = TRUE)) })
 
   output$timeline_plot <- renderPlotly({
-    req(active_parsed())
-    tr <- selected_trial()
-    ggplotly(safe_timeline(active_parsed(), tr), tooltip = c("x", "y", "linewidth")) %>%
-      layout(dragmode = "zoom", title = list(text = paste("事件时间线 - Trial:", ifelse(nzchar(tr), tr, "All"))))
-  })
-  output$scanpath_plot <- renderPlotly({
-    req(active_parsed())
+    req(analysis_view())
     tr <- selected_trial()
     ph <- selected_phase()
-    ggplotly(safe_scanpath(active_parsed(), tr, ph, reference_img()), tooltip = c("x", "y", "size", "label")) %>%
+    ggplotly(safe_timeline(analysis_view()$parsed, ""), tooltip = c("x", "y", "linewidth")) %>%
+      layout(dragmode = "zoom", title = list(text = paste("事件时间线 - Trial:", ifelse(nzchar(tr), tr, "All"), "Phase:", ifelse(nzchar(ph), ph, "All"))))
+  })
+  output$scanpath_plot <- renderPlotly({
+    req(analysis_view())
+    tr <- selected_trial()
+    ph <- selected_phase()
+    ggplotly(safe_scanpath(analysis_view()$parsed, "", "", reference_img()), tooltip = c("x", "y", "size", "label")) %>%
       layout(dragmode = "zoom", title = list(text = paste("注视路径 - Trial:", ifelse(nzchar(tr), tr, "All"), "Phase:", ifelse(nzchar(ph), ph, "All"))))
   })
   output$heatmap_plot <- renderPlotly({
-    req(active_parsed())
+    req(analysis_view())
     tr <- selected_trial()
     ph <- selected_phase()
-    ggplotly(safe_heatmap(active_parsed(), tr, ph, reference_img()), tooltip = c("x", "y", "fill")) %>%
+    ggplotly(safe_heatmap(analysis_view()$parsed, "", "", reference_img()), tooltip = c("x", "y", "fill")) %>%
       layout(dragmode = "zoom", title = list(text = paste("眼动热图 - Trial:", ifelse(nzchar(tr), tr, "All"), "Phase:", ifelse(nzchar(ph), ph, "All"))))
   })
   output$pupil_plot <- renderPlotly({
-    req(current_reports())
+    req(analysis_view())
     tr <- selected_trial()
     ph <- selected_phase()
-    ggplotly(safe_pupil_curve(current_reports(), tr, ph), tooltip = c("x", "y", "colour")) %>%
+    ggplotly(safe_pupil_curve(analysis_view()$reports, "", ""), tooltip = c("x", "y", "colour")) %>%
       layout(dragmode = "zoom", title = list(text = paste("瞳孔变化曲线 - Trial:", ifelse(nzchar(tr), tr, "All"), "Phase:", ifelse(nzchar(ph), ph, "All"))))
   })
 
@@ -500,10 +554,10 @@ server <- function(input, output, session) {
     content = function(file) {
       p <- switch(
         input$png_plot,
-        timeline = safe_timeline(active_parsed(), selected_trial()),
-        scanpath = safe_scanpath(active_parsed(), selected_trial(), selected_phase(), reference_img()),
-        heatmap = safe_heatmap(active_parsed(), selected_trial(), selected_phase(), reference_img()),
-        pupil = safe_pupil_curve(current_reports(), selected_trial(), selected_phase()),
+        timeline = safe_timeline(analysis_view()$parsed, ""),
+        scanpath = safe_scanpath(analysis_view()$parsed, "", "", reference_img()),
+        heatmap = safe_heatmap(analysis_view()$parsed, "", "", reference_img()),
+        pupil = safe_pupil_curve(analysis_view()$reports, "", ""),
         aoi = plot_aoi_canvas(active_parsed(), aoi_dt(), reference_img())
       )
       ggplot2::ggsave(file, p, width = 10, height = 6, dpi = 160, device = ragg::agg_png)
