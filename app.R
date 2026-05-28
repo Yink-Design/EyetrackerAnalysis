@@ -3,7 +3,7 @@
 
 options(shiny.maxRequestSize = 1024 * 1024^2)
 
-required_packages <- c("shiny", "DT", "data.table", "ggplot2", "openxlsx", "ggforce", "png", "jpeg", "plotly")
+required_packages <- c("shiny", "DT", "data.table", "ggplot2", "openxlsx", "ggforce", "png", "jpeg", "plotly", "readxl")
 missing_packages <- required_packages[!vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)]
 if (length(missing_packages) > 0) {
   stop("Missing R packages: ", paste(missing_packages, collapse = ", "), ". Run source('install_dependencies.R') first.", call. = FALSE)
@@ -167,6 +167,23 @@ ui <- fluidPage(
         tabPanel("AOI 分析", br(), plotOutput("aoi_overlay_plot", height = 460), h4("AOI Report"), DTOutput("aoi_report_tbl")),
         tabPanel("答题合并", br(), h4("时间戳 / 题目匹配检查"), DTOutput("behavior_check_tbl"), h4("眼动 + 行为综合表"), DTOutput("merged_behavior_tbl"), h4("Condition Summary"), DTOutput("condition_summary_tbl")),
         tabPanel("原始报表", br(), h4("Fixation"), DTOutput("fix_tbl"), h4("Saccade"), DTOutput("sac_tbl"), h4("Blink"), DTOutput("blink_tbl"), h4("Messages / Events"), DTOutput("event_tbl")),
+        tabPanel("DataViewer 对齐检查", br(),
+          fluidRow(
+            column(4, fileInput("dv_trial_file", "Trial Report", accept = c(".xls", ".xlsx", ".csv", ".txt"))),
+            column(4, fileInput("dv_message_file", "Message Report", accept = c(".xls", ".xlsx", ".csv", ".txt"))),
+            column(4, fileInput("dv_fixation_file", "Fixation Report", accept = c(".xls", ".xlsx", ".csv", ".txt")))
+          ),
+          fluidRow(
+            column(4, fileInput("dv_saccade_file", "Saccade Report", accept = c(".xls", ".xlsx", ".csv", ".txt"))),
+            column(4, fileInput("dv_timecourse_file", "Time Course Report", accept = c(".xls", ".xlsx", ".csv", ".txt"))),
+            column(4, br(), actionButton("run_dv_compare", "运行对齐检查", class = "btn-primary"), downloadButton("download_dv_alignment", "下载对齐报告"))
+          ),
+          h4("Trial Mapping"), DTOutput("dv_trial_mapping_tbl"),
+          h4("Event Time Compare"), DTOutput("dv_event_compare_tbl"),
+          h4("Fixation Count Compare"), DTOutput("dv_fix_count_tbl"),
+          h4("Pupil Mean Compare"), DTOutput("dv_pupil_compare_tbl"),
+          h4("Warnings"), DTOutput("dv_warnings_tbl")
+        ),
         tabPanel("导出", br(), fluidRow(column(5, uiOutput("report_download_ui"), downloadButton("download_csv", "导出所选 CSV")), column(5, selectInput("png_plot", "PNG 图像", choices = c("事件时间线" = "timeline", "Scanpath" = "scanpath", "Heatmap" = "heatmap", "瞳孔曲线" = "pupil", "AOI 叠加" = "aoi"))), column(2, br(), downloadButton("download_png", "导出 PNG"))), hr(), DTOutput("export_inventory_tbl"))
       )
     )
@@ -179,6 +196,8 @@ server <- function(input, output, session) {
   aoi_dt <- reactiveVal(empty_aoi())
   behavior_dt <- reactiveVal(data.table())
   reference_img <- reactiveVal(NULL)
+  dv_alignment <- reactiveVal(list())
+  dv_alignment_file <- reactiveVal(NULL)
 
   observeEvent(input$reference_file, {
     req(input$reference_file)
@@ -404,6 +423,45 @@ server <- function(input, output, session) {
   output$behavior_check_tbl <- render_report("behavior_check_report")
   output$merged_behavior_tbl <- render_report("merged_eye_behavior_report", 1000)
   output$condition_summary_tbl <- render_report("condition_summary")
+
+  observeEvent(input$run_dv_compare, {
+    req(active_parsed(), current_reports())
+    out <- tempfile(fileext = ".xlsx")
+    file_path <- function(x) if (is.null(x)) NULL else x$datapath
+    sheets <- compare_with_dataviewer(
+      parsed = active_parsed(),
+      reports = current_reports(),
+      dv_trial_file = file_path(input$dv_trial_file),
+      dv_message_file = file_path(input$dv_message_file),
+      dv_fixation_file = file_path(input$dv_fixation_file),
+      dv_saccade_file = file_path(input$dv_saccade_file),
+      dv_timecourse_file = file_path(input$dv_timecourse_file),
+      out_file = out
+    )
+    dv_alignment(sheets)
+    dv_alignment_file(out)
+  })
+
+  render_dv_sheet <- function(name) {
+    renderDT({
+      x <- dv_alignment()[[name]]
+      req(x)
+      datatable(x, filter = "top", rownames = FALSE, options = list(scrollX = TRUE, pageLength = 10))
+    })
+  }
+  output$dv_trial_mapping_tbl <- render_dv_sheet("trial_mapping")
+  output$dv_event_compare_tbl <- render_dv_sheet("event_time_compare")
+  output$dv_fix_count_tbl <- render_dv_sheet("fixation_count_compare")
+  output$dv_pupil_compare_tbl <- render_dv_sheet("pupil_mean_compare")
+  output$dv_warnings_tbl <- render_dv_sheet("warnings")
+
+  output$download_dv_alignment <- downloadHandler(
+    filename = function() paste0("dv_alignment_report_", Sys.Date(), ".xlsx"),
+    content = function(file) {
+      req(dv_alignment_file())
+      file.copy(dv_alignment_file(), file, overwrite = TRUE)
+    }
+  )
 
   output$report_download_ui <- renderUI({
     rep <- current_reports()

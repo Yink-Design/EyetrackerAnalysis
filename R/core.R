@@ -18,6 +18,33 @@ safe_mean <- function(x) { x <- as.numeric(x); if (length(x) == 0 || all(is.na(x
 safe_sum <- function(x) { x <- as.numeric(x); if (length(x) == 0 || all(is.na(x))) 0 else sum(x, na.rm = TRUE) }
 safe_max <- function(x) { x <- as.numeric(x); if (length(x) == 0 || all(is.na(x))) NA_real_ else max(x, na.rm = TRUE) }
 
+interval_overlaps <- function(event_start, event_end, window_start, window_end) {
+  event_start < window_end & event_end > window_start
+}
+
+clip_interval <- function(event_start, event_end, window_start, window_end) {
+  clipped_start <- pmax(event_start, window_start)
+  clipped_end <- pmin(event_end, window_end)
+  clipped_duration <- pmax(0, clipped_end - clipped_start)
+  data.table::data.table(
+    clipped_start = clipped_start,
+    clipped_end = clipped_end,
+    clipped_duration = clipped_duration,
+    relative_start = clipped_start - window_start,
+    relative_end = clipped_end - window_start
+  )
+}
+
+apply_sample_validity <- function(samples, pupil_valid_requires_gaze = TRUE, pupil_min_value = 0) {
+  need_pkg("data.table")
+  if (is.null(samples) || nrow(samples) == 0) return(samples)
+  dt <- data.table::copy(samples)
+  dt[, valid_gaze := is.finite(gaze_x) & is.finite(gaze_y)]
+  dt[, valid_pupil := is.finite(pupil) & pupil > pupil_min_value]
+  dt[, valid_sample := if (isTRUE(pupil_valid_requires_gaze)) valid_gaze & valid_pupil else valid_pupil]
+  dt
+}
+
 parse_kv <- function(text) {
   toks <- strsplit(text, "\\s+")[[1]]
   toks <- toks[grepl("^[A-Za-z0-9_.:-]+=", toks)]
@@ -51,7 +78,7 @@ parse_asc <- function(file, keep_samples = TRUE, progress = NULL) {
   if (is.function(progress)) progress("解析 gaze samples", 0.20)
   samples <- if (keep_samples) parse_samples(lines, progress = function(value) {
     if (is.function(progress)) progress(sprintf("解析 gaze samples %.0f%%", value * 100), 0.20 + value * 0.42)
-  }) else empty_dt(c("sample_index", "time", "gaze_x", "gaze_y", "pupil", "valid_gaze", "valid_pupil"))
+  }) else empty_dt(c("sample_index", "time", "gaze_x", "gaze_y", "pupil", "valid_gaze", "valid_pupil", "valid_sample"))
   if (is.function(progress)) progress("解析 EFIX / ESACC / EBLINK", 0.66)
   fixations <- parse_fixations(lines)
   saccades <- parse_saccades(lines)
@@ -132,23 +159,30 @@ parse_messages <- function(lines) {
 parse_samples <- function(lines, progress = NULL) {
   need_pkg("data.table")
   idx <- grep("^\\s*[0-9]+\\s+", lines)
-  if (length(idx) == 0) return(empty_dt(c("sample_index", "time", "gaze_x", "gaze_y", "pupil", "valid_gaze", "valid_pupil")))
-  chunk_size <- 50000L
-  starts <- seq.int(1L, length(idx), by = chunk_size)
-  out <- vector("list", length(starts))
-  for (chunk_id in seq_along(starts)) {
-    chunk_seq <- starts[[chunk_id]]:min(starts[[chunk_id]] + chunk_size - 1L, length(idx))
-    out[[chunk_id]] <- lapply(chunk_seq, function(k) {
-      p <- strsplit(trimws(lines[idx[k]]), "\\s+")[[1]]
-      if (length(p) < 4) return(NULL)
-      data.table::data.table(sample_index = k, time = as_num(p[1]), gaze_x = as_num(p[2]), gaze_y = as_num(p[3]), pupil = as_num(p[4]))
-    })
-    if (is.function(progress)) progress(max(chunk_seq) / length(idx))
-  }
-  out <- unlist(out, recursive = FALSE)
-  dt <- data.table::rbindlist(out, fill = TRUE)
-  dt[, valid_gaze := !is.na(gaze_x) & !is.na(gaze_y)]
-  dt[, valid_pupil := !is.na(pupil)]
+  if (length(idx) == 0) return(empty_dt(c("sample_index", "time", "gaze_x", "gaze_y", "pupil", "valid_gaze", "valid_pupil", "valid_sample")))
+  if (is.function(progress)) progress(0.05)
+  sample_lines <- gsub("\\s+", " ", trimws(lines[idx]), perl = TRUE)
+  if (is.function(progress)) progress(0.20)
+  raw <- data.table::fread(
+    text = paste(sample_lines, collapse = "\n"),
+    header = FALSE,
+    sep = " ",
+    fill = TRUE,
+    na.strings = c(".", "...", "", "NA", "NaN"),
+    showProgress = FALSE,
+    select = 1:4
+  )
+  if (is.function(progress)) progress(0.85)
+  while (ncol(raw) < 4) raw[[paste0("V", ncol(raw) + 1L)]] <- NA_real_
+  dt <- data.table::data.table(
+    sample_index = seq_len(nrow(raw)),
+    time = as_num(raw[[1]]),
+    gaze_x = as_num(raw[[2]]),
+    gaze_y = as_num(raw[[3]]),
+    pupil = as_num(raw[[4]])
+  )
+  dt <- apply_sample_validity(dt, pupil_valid_requires_gaze = TRUE, pupil_min_value = 0)
+  if (is.function(progress)) progress(1)
   dt
 }
 
@@ -214,11 +248,13 @@ build_phases <- function(parsed) {
   if (is.null(tr) || nrow(tr) == 0) { parsed$phases <- data.table::data.table(); return(parsed) }
   for (i in seq_len(nrow(tr))) {
     tid <- tr$trial_id[i]; ev <- evs[trial_id == tid]
-    rows <- add_phase(rows, tr$participant[i], tid, tr$condition[i], "trial", "trial_total", tr$trial_start[i], tr$trial_end[i])
+    rows <- add_phase(rows, tr$participant[i], tid, tr$condition[i], "trial_total", "trial_total", tr$trial_start[i], tr$trial_end[i])
     ls <- first_non_na(ev[event_name == "LOADING_START"]$time, NA_real_); le <- first_non_na(ev[event_name == "LOADING_COMPLETE"]$time, NA_real_)
     rows <- add_phase(rows, tr$participant[i], tid, tr$condition[i], "loading", "loading_start_to_complete", ls, le)
     vs <- first_non_na(ev[event_name == "VIEWER_ENTER"]$time, NA_real_); ve <- first_non_na(ev[event_name == "VIEWER_EXIT"]$time, tr$trial_end[i])
-    rows <- add_phase(rows, tr$participant[i], tid, tr$condition[i], "viewer", "viewer_total", vs, ve)
+    first_qs <- first_non_na(ev[event_name == "QUESTION_START"]$time, NA_real_)
+    viewer_clean_end <- if (!is.na(first_qs)) first_qs else ve
+    rows <- add_phase(rows, tr$participant[i], tid, tr$condition[i], "viewer_clean", "viewer_enter_to_question", vs, viewer_clean_end)
     ps <- first_non_na(ev[event_name == "PROGRESSIVE_USABLE"]$time, NA_real_)
     rows <- add_phase(rows, tr$participant[i], tid, tr$condition[i], "progressive_usable", "progressive_usable_to_complete", ps, le)
     qs <- ev[event_name == "QUESTION_START"]
@@ -240,7 +276,7 @@ assign_table <- function(dt, trials, phases, time_col) {
     hit <- times >= trials$trial_start[i] & times <= trials$trial_end[i]
     dt$participant[hit] <- trials$participant[i]; dt$trial_id[hit] <- trials$trial_id[i]; dt$condition[hit] <- trials$condition[i]
   }
-  priority <- c(trial = 1, viewer = 2, loading = 3, progressive_usable = 4, question = 5)
+  priority <- c(trial_total = 1, viewer_clean = 2, loading = 3, progressive_usable = 4, question = 5)
   phases[, priority := priority[phase]]; phases[is.na(priority), priority := 0]; phases <- phases[order(priority)]
   for (i in seq_len(nrow(phases))) {
     hit <- times >= phases$start_time[i] & times <= phases$end_time[i] & dt$trial_id == phases$trial_id[i]
@@ -263,54 +299,189 @@ metadata_report <- function(parsed) {
 }
 
 quality_report <- function(parsed) {
-  s <- parsed$samples
-  data.table::data.table(source_file = parsed$metadata$source_file, participant = parsed$metadata$participant, sample_count = nrow(s), valid_sample_rate = if (nrow(s) > 0) mean(s$valid_gaze & s$valid_pupil, na.rm = TRUE) else NA_real_, missing_data_rate = if (nrow(s) > 0) 1 - mean(s$valid_gaze & s$valid_pupil, na.rm = TRUE) else NA_real_, fixation_count = nrow(parsed$fixations), saccade_count = nrow(parsed$saccades), blink_count = nrow(parsed$blinks), message_count = nrow(parsed$messages), event_count = nrow(parsed$events), trial_count = nrow(parsed$trials), validation_status = parsed$metadata$validation_status, validation_avg_error = parsed$metadata$validation_avg_error, validation_max_error = parsed$metadata$validation_max_error)
+  s <- apply_sample_validity(parsed$samples)
+  data.table::data.table(source_file = parsed$metadata$source_file, participant = parsed$metadata$participant, sample_count = nrow(s), valid_sample_rate = if (nrow(s) > 0) mean(s$valid_sample, na.rm = TRUE) else NA_real_, missing_data_rate = if (nrow(s) > 0) 1 - mean(s$valid_sample, na.rm = TRUE) else NA_real_, fixation_count = nrow(parsed$fixations), saccade_count = nrow(parsed$saccades), blink_count = nrow(parsed$blinks), message_count = nrow(parsed$messages), event_count = nrow(parsed$events), trial_count = nrow(parsed$trials), validation_status = parsed$metadata$validation_status, validation_avg_error = parsed$metadata$validation_avg_error, validation_max_error = parsed$metadata$validation_max_error)
 }
 
-get_baseline <- function(samples, start, end, baseline_ms = 500) {
-  pre <- samples[time >= start - baseline_ms & time < start & valid_pupil == TRUE]
+get_baseline <- function(samples, start, end, baseline_ms = 500, pupil_valid_requires_gaze = TRUE, pupil_min_value = 0) {
+  samples <- apply_sample_validity(samples, pupil_valid_requires_gaze, pupil_min_value)
+  pre <- samples[time >= start - baseline_ms & time < start & valid_sample == TRUE]
   if (nrow(pre) >= 5) return(mean(pre$pupil, na.rm = TRUE))
-  early <- samples[time >= start & time <= min(end, start + baseline_ms) & valid_pupil == TRUE]
+  early <- samples[time >= start & time < min(end, start + baseline_ms) & valid_sample == TRUE]
   if (nrow(early) >= 5) return(mean(early$pupil, na.rm = TRUE))
   NA_real_
 }
 
-summarise_interval <- function(parsed, iv, level = "phase", baseline_ms = 500) {
+trial_intervals <- function(parsed) {
+  tr <- data.table::copy(parsed$trials)
+  if (is.null(tr) || nrow(tr) == 0) return(data.table::data.table())
+  tr[, `:=`(
+    phase = "trial_total",
+    phase_instance = "trial_total",
+    question_id = NA_character_,
+    start_time = trial_start,
+    end_time = trial_end,
+    duration = trial_end - trial_start,
+    phase_id = paste(trial_id, "trial_total", sep = "__")
+  )]
+  tr
+}
+
+add_duration_level <- function(trials, phases) {
+  tr <- data.table::copy(trials)
+  if (is.null(tr) || nrow(tr) == 0) return(tr)
+  ld <- phases[phase == "loading", .(trial_id, actual_loading_ms = duration)]
+  tr <- merge(tr, ld, by = "trial_id", all.x = TRUE)
+  tr[, duration_level := NA_character_]
+  tr[!is.na(actual_loading_ms), duration_level := {
+    r <- rank(actual_loading_ms, ties.method = "first")
+    ifelse(r <= ceiling(.N / 2), "short", "long")
+  }, by = condition]
+  tr
+}
+
+clip_events_to_intervals <- function(events, intervals, event_type) {
+  need_pkg("data.table")
+  if (is.null(events) || nrow(events) == 0 || is.null(intervals) || nrow(intervals) == 0) return(data.table::data.table())
+  id_col <- switch(event_type, fixation = "fixation_id", saccade = "saccade_id", blink = "blink_id", "event_id")
+  ev <- data.table::copy(events)
+  ivs <- data.table::copy(intervals)
+  if (!"phase_id" %in% names(ivs)) ivs[, phase_id := paste(trial_id, ifelse("phase_instance" %in% names(ivs), phase_instance, "trial_total"), sep = "__")]
+  if (!"duration_level" %in% names(ivs)) ivs[, duration_level := NA_character_]
+  rows <- vector("list", nrow(ivs))
+  for (i in seq_len(nrow(ivs))) {
+    iv <- ivs[i]
+    hit <- ev[interval_overlaps(start_time, end_time, iv$start_time, iv$end_time)]
+    if (nrow(hit) == 0) next
+    clip <- clip_interval(hit$start_time, hit$end_time, iv$start_time, iv$end_time)
+    out <- data.table::data.table(
+      event_type = event_type,
+      event_id = hit[[id_col]],
+      participant = iv$participant,
+      trial_id = iv$trial_id,
+      condition = iv$condition,
+      duration_level = iv$duration_level,
+      phase = if ("phase" %in% names(iv)) iv$phase else "trial_total",
+      phase_instance = if ("phase_instance" %in% names(iv)) iv$phase_instance else "trial_total",
+      question_id = if ("question_id" %in% names(iv)) iv$question_id else NA_character_,
+      phase_id = iv$phase_id,
+      window_start = iv$start_time,
+      window_end = iv$end_time,
+      window_duration = iv$end_time - iv$start_time,
+      original_start_time = hit$start_time,
+      original_end_time = hit$end_time,
+      original_duration = hit$duration,
+      clipped_start_time = clip$clipped_start,
+      clipped_end_time = clip$clipped_end,
+      clipped_duration = clip$clipped_duration,
+      relative_start_time = clip$relative_start,
+      relative_end_time = clip$relative_end
+    )
+    if ("eye" %in% names(hit)) out[, eye := hit$eye]
+    if (event_type == "fixation") out[, `:=`(fixation_id = hit$fixation_id, x = hit$x, y = hit$y, mean_pupil = hit$mean_pupil)]
+    if (event_type == "saccade") out[, `:=`(saccade_id = hit$saccade_id, start_x = hit$start_x, start_y = hit$start_y, end_x = hit$end_x, end_y = hit$end_y, amplitude = hit$amplitude, peak_velocity = hit$peak_velocity, direction = hit$direction)]
+    if (event_type == "blink") out[, blink_id := hit$blink_id]
+    rows[[i]] <- out
+  }
+  data.table::rbindlist(rows, fill = TRUE)
+}
+
+summarise_interval <- function(parsed, iv, level = "phase", baseline_ms = 500, clipped_fixations = NULL, clipped_saccades = NULL, clipped_blinks = NULL, pupil_valid_requires_gaze = TRUE, pupil_min_value = 0) {
   start <- if ("start_time" %in% names(iv)) iv$start_time else iv$trial_start
   end <- if ("end_time" %in% names(iv)) iv$end_time else iv$trial_end
   dur <- end - start
-  sm <- parsed$samples[time >= start & time <= end]
-  fx <- parsed$fixations[start_time >= start & start_time <= end]
-  sc <- parsed$saccades[start_time >= start & start_time <= end]
-  bl <- parsed$blinks[start_time >= start & start_time <= end]
-  base <- get_baseline(parsed$samples, start, end, baseline_ms)
-  vp <- sm[valid_pupil == TRUE]$pupil; delta <- vp - base
+  phase_id <- if ("phase_id" %in% names(iv)) iv$phase_id else paste(if ("trial_id" %in% names(iv)) iv$trial_id else "", if ("phase_instance" %in% names(iv)) iv$phase_instance else "trial_total", sep = "__")
+  sm <- apply_sample_validity(parsed$samples[time >= start & time < end], pupil_valid_requires_gaze, pupil_min_value)
+  window_id <- phase_id
+  fx <- if (!is.null(clipped_fixations) && nrow(clipped_fixations) > 0) clipped_fixations[phase_id == window_id] else data.table::data.table()
+  sc <- if (!is.null(clipped_saccades) && nrow(clipped_saccades) > 0) clipped_saccades[phase_id == window_id] else data.table::data.table()
+  bl <- if (!is.null(clipped_blinks) && nrow(clipped_blinks) > 0) clipped_blinks[phase_id == window_id] else data.table::data.table()
+  base <- get_baseline(parsed$samples, start, end, baseline_ms, pupil_valid_requires_gaze, pupil_min_value)
+  valid_sm <- sm[valid_sample == TRUE]
+  vp <- valid_sm$pupil; delta <- vp - base
   slope <- NA_real_
-  if (length(vp) > 5 && !all(is.na(delta))) { x <- (sm[valid_pupil == TRUE]$time - start) / 1000; fit <- tryCatch(lm(delta ~ x), error = function(e) NULL); if (!is.null(fit)) slope <- unname(coef(fit)[2]) }
-  data.table::data.table(level = level, participant = if ("participant" %in% names(iv)) iv$participant else NA_character_, trial_id = if ("trial_id" %in% names(iv)) iv$trial_id else NA_character_, condition = if ("condition" %in% names(iv)) iv$condition else NA_character_, phase = if ("phase" %in% names(iv)) iv$phase else "trial", phase_instance = if ("phase_instance" %in% names(iv)) iv$phase_instance else "trial_total", question_id = if ("question_id" %in% names(iv)) iv$question_id else NA_character_, start_time = start, end_time = end, duration_ms = dur, duration_sec = dur / 1000, sample_count = nrow(sm), valid_sample_rate = if (nrow(sm) > 0) mean(sm$valid_gaze & sm$valid_pupil, na.rm = TRUE) else NA_real_, missing_data_rate = if (nrow(sm) > 0) 1 - mean(sm$valid_gaze & sm$valid_pupil, na.rm = TRUE) else NA_real_, fixation_count = nrow(fx), mean_fixation_duration = safe_mean(fx$duration), median_fixation_duration = if (nrow(fx) > 0) median(fx$duration, na.rm = TRUE) else NA_real_, total_fixation_duration = safe_sum(fx$duration), fixation_rate_per_sec = ifelse(dur > 0, nrow(fx) / (dur / 1000), NA_real_), first_fixation_latency = ifelse(nrow(fx) > 0, min(fx$start_time, na.rm = TRUE) - start, NA_real_), saccade_count = nrow(sc), mean_saccade_amplitude = safe_mean(sc$amplitude), total_scanpath_length = safe_sum(sc$amplitude), mean_peak_velocity = safe_mean(sc$peak_velocity), saccade_rate_per_sec = ifelse(dur > 0, nrow(sc) / (dur / 1000), NA_real_), blink_count = nrow(bl), blink_rate_per_sec = ifelse(dur > 0, nrow(bl) / (dur / 1000), NA_real_), total_blink_duration = safe_sum(bl$duration), mean_blink_duration = safe_mean(bl$duration), mean_pupil_area = safe_mean(vp), baseline_pupil_area = base, baseline_corrected_pupil_area = safe_mean(delta), peak_pupil_dilation = safe_max(delta), pupil_slope_per_sec = slope)
+  if (length(vp) > 5 && !all(is.na(delta))) { x <- (valid_sm$time - start) / 1000; fit <- tryCatch(lm(delta ~ x), error = function(e) NULL); if (!is.null(fit)) slope <- unname(coef(fit)[2]) }
+  data.table::data.table(level = level, participant = if ("participant" %in% names(iv)) iv$participant else NA_character_, trial_id = if ("trial_id" %in% names(iv)) iv$trial_id else NA_character_, condition = if ("condition" %in% names(iv)) iv$condition else NA_character_, duration_level = if ("duration_level" %in% names(iv)) iv$duration_level else NA_character_, phase = if ("phase" %in% names(iv)) iv$phase else "trial_total", phase_instance = if ("phase_instance" %in% names(iv)) iv$phase_instance else "trial_total", question_id = if ("question_id" %in% names(iv)) iv$question_id else NA_character_, start_time = start, end_time = end, duration_ms = dur, duration_sec = dur / 1000, sample_count = nrow(sm), valid_sample_count = nrow(valid_sm), valid_sample_rate = if (nrow(sm) > 0) mean(sm$valid_sample, na.rm = TRUE) else NA_real_, missing_data_rate = if (nrow(sm) > 0) 1 - mean(sm$valid_sample, na.rm = TRUE) else NA_real_, fixation_count = nrow(fx), mean_fixation_duration = safe_mean(fx$clipped_duration), median_fixation_duration = if (nrow(fx) > 0) median(fx$clipped_duration, na.rm = TRUE) else NA_real_, total_fixation_duration = safe_sum(fx$clipped_duration), fixation_rate_per_sec = ifelse(dur > 0, nrow(fx) / (dur / 1000), NA_real_), first_fixation_latency = ifelse(nrow(fx) > 0, min(fx$relative_start_time, na.rm = TRUE), NA_real_), saccade_count = nrow(sc), mean_saccade_amplitude = safe_mean(sc$amplitude), total_scanpath_length = safe_sum(sc$amplitude), mean_peak_velocity = safe_mean(sc$peak_velocity), saccade_rate_per_sec = ifelse(dur > 0, nrow(sc) / (dur / 1000), NA_real_), blink_count = nrow(bl), blink_rate_per_sec = ifelse(dur > 0, nrow(bl) / (dur / 1000), NA_real_), total_blink_duration = safe_sum(bl$clipped_duration), mean_blink_duration = safe_mean(bl$clipped_duration), mean_pupil_area = safe_mean(vp), baseline_pupil_area = base, baseline_corrected_pupil_area = safe_mean(delta), peak_pupil_dilation = safe_max(delta), pupil_slope_per_sec = slope)
 }
 
-interval_report <- function(parsed, intervals, level, baseline_ms = 500) {
+interval_report <- function(parsed, intervals, level, baseline_ms = 500, clipped_fixations = NULL, clipped_saccades = NULL, clipped_blinks = NULL, pupil_valid_requires_gaze = TRUE, pupil_min_value = 0) {
   if (is.null(intervals) || nrow(intervals) == 0) return(data.table::data.table())
-  data.table::rbindlist(lapply(seq_len(nrow(intervals)), function(i) summarise_interval(parsed, intervals[i], level, baseline_ms)), fill = TRUE)
+  data.table::rbindlist(lapply(seq_len(nrow(intervals)), function(i) summarise_interval(parsed, intervals[i], level, baseline_ms, clipped_fixations, clipped_saccades, clipped_blinks, pupil_valid_requires_gaze, pupil_min_value)), fill = TRUE)
 }
 
-pupil_timeseries <- function(parsed, bin_ms = 100, baseline_ms = 500) {
-  rows <- list(); ph <- parsed$phases
-  for (i in seq_len(nrow(ph))) {
-    sm <- parsed$samples[time >= ph$start_time[i] & time <= ph$end_time[i]]
+pupil_timeseries <- function(parsed, bin_ms = 100, baseline_ms = 500, interval_mode = c("phase", "full_trial"), align_to = c("window_start", "trial_start", "loading_start"), use_valid_sample = TRUE, pupil_valid_requires_gaze = TRUE, pupil_min_value = 0) {
+  interval_mode <- match.arg(interval_mode)
+  align_to <- match.arg(align_to)
+  rows <- list()
+  ivs <- if (interval_mode == "full_trial") trial_intervals(parsed) else data.table::copy(parsed$phases)
+  if (nrow(ivs) == 0) return(data.table::data.table())
+  tr_meta <- add_duration_level(parsed$trials, parsed$phases)[, .(trial_id, duration_level, trial_start)]
+  ivs <- merge(ivs, tr_meta, by = "trial_id", all.x = TRUE, suffixes = c("", "_trial"))
+  for (i in seq_len(nrow(ivs))) {
+    iv <- ivs[i]
+    sm <- apply_sample_validity(parsed$samples[time >= iv$start_time & time < iv$end_time], pupil_valid_requires_gaze, pupil_min_value)
     if (nrow(sm) == 0) next
-    base <- get_baseline(parsed$samples, ph$start_time[i], ph$end_time[i], baseline_ms)
-    sm[, bin_start := floor((time - ph$start_time[i]) / bin_ms) * bin_ms]
-    tb <- sm[, .(bin_end = bin_start[1] + bin_ms, sample_count = .N, valid_rate = mean(valid_gaze & valid_pupil, na.rm = TRUE), mean_gaze_x = safe_mean(gaze_x), mean_gaze_y = safe_mean(gaze_y), mean_pupil_area = safe_mean(pupil), baseline_pupil_area = base, baseline_corrected_pupil_area = safe_mean(pupil - base)), by = bin_start]
-    tb[, `:=`(participant = ph$participant[i], trial_id = ph$trial_id[i], condition = ph$condition[i], phase = ph$phase[i], phase_instance = ph$phase_instance[i], question_id = ph$question_id[i], bin_ms = bin_ms)]
+    loading_start <- first_non_na(parsed$phases[trial_id == iv$trial_id & phase == "loading"]$start_time, iv$start_time)
+    align_time <- switch(align_to, window_start = iv$start_time, trial_start = iv$trial_start, loading_start = loading_start)
+    base <- get_baseline(parsed$samples, iv$start_time, iv$end_time, baseline_ms, pupil_valid_requires_gaze, pupil_min_value)
+    sm[, rel_time := time - align_time]
+    sm[, bin_start := floor(rel_time / bin_ms) * bin_ms]
+    tb <- sm[, {
+      good <- if (use_valid_sample) valid_sample == TRUE else rep(TRUE, .N)
+      pupil_values <- pupil[good]
+      .(bin_end = bin_start[1] + bin_ms, bin_mid = bin_start[1] + bin_ms / 2, sample_count = .N, valid_sample_count = sum(valid_sample, na.rm = TRUE), valid_rate = mean(valid_sample, na.rm = TRUE), mean_gaze_x = safe_mean(gaze_x[valid_gaze == TRUE]), mean_gaze_y = safe_mean(gaze_y[valid_gaze == TRUE]), mean_pupil_area = safe_mean(pupil_values), baseline_pupil_area = base, baseline_corrected_pupil_area = safe_mean(pupil_values - base))
+    }, by = bin_start]
+    tb[, `:=`(participant = iv$participant, trial_id = iv$trial_id, condition = iv$condition, duration_level = iv$duration_level, phase = iv$phase, phase_instance = iv$phase_instance, question_id = iv$question_id, bin_ms = bin_ms, interval_mode = interval_mode, align_to = align_to)]
     rows[[length(rows) + 1]] <- tb
   }
   data.table::rbindlist(rows, fill = TRUE)
 }
 
-compute_reports <- function(parsed, bin_ms = 100, baseline_ms = 500) {
-  list(metadata = metadata_report(parsed), quality_report = quality_report(parsed), trial_report = interval_report(parsed, parsed$trials, "trial", baseline_ms), phase_report = interval_report(parsed, parsed$phases, "phase", baseline_ms), fixation_report = parsed$fixations, saccade_report = parsed$saccades, blink_report = parsed$blinks, pupil_timeseries = pupil_timeseries(parsed, bin_ms, baseline_ms), event_report = parsed$events, message_report = parsed$messages, metric_dictionary = metric_dictionary())
+phase_analysis_long <- function(reports, main_phase = "loading") {
+  if (is.null(reports$phase_report) || nrow(reports$phase_report) == 0) return(data.table::data.table())
+  x <- data.table::copy(reports$phase_report)
+  x <- x[phase == main_phase]
+  cols <- c("participant", "trial_id", "condition", "duration_level", "phase", "duration_ms", "fixation_count", "mean_fixation_duration", "saccade_count", "mean_saccade_amplitude", "blink_count", "blink_rate_per_sec", "mean_pupil_area", "baseline_corrected_pupil_area", "peak_pupil_dilation", "pupil_slope_per_sec")
+  x[, actual_loading_ms := duration_ms]
+  cols <- c("participant", "trial_id", "condition", "duration_level", "phase", "actual_loading_ms", setdiff(cols, c("participant", "trial_id", "condition", "duration_level", "phase", "duration_ms")))
+  x[, ..cols]
+}
+
+compute_reports <- function(parsed, bin_ms = 100, baseline_ms = 500, pupil_valid_requires_gaze = TRUE, pupil_min_value = 0) {
+  parsed$samples <- apply_sample_validity(parsed$samples, pupil_valid_requires_gaze, pupil_min_value)
+  trial_iv <- trial_intervals(parsed)
+  trial_meta <- add_duration_level(parsed$trials, parsed$phases)[, .(trial_id, duration_level, actual_loading_ms)]
+  if (nrow(trial_iv) > 0) trial_iv <- merge(trial_iv, trial_meta, by = "trial_id", all.x = TRUE, suffixes = c("", "_meta"))
+  phase_iv <- data.table::copy(parsed$phases)
+  if (nrow(phase_iv) > 0) phase_iv <- merge(phase_iv, trial_meta, by = "trial_id", all.x = TRUE, suffixes = c("", "_meta"))
+  fix_trial <- clip_events_to_intervals(parsed$fixations, trial_iv, "fixation")
+  sac_trial <- clip_events_to_intervals(parsed$saccades, trial_iv, "saccade")
+  blink_trial <- clip_events_to_intervals(parsed$blinks, trial_iv, "blink")
+  fix_phase <- clip_events_to_intervals(parsed$fixations, phase_iv, "fixation")
+  sac_phase <- clip_events_to_intervals(parsed$saccades, phase_iv, "saccade")
+  blink_phase <- clip_events_to_intervals(parsed$blinks, phase_iv, "blink")
+  reports <- list(
+    metadata = metadata_report(parsed),
+    quality_report = quality_report(parsed),
+    trial_report = interval_report(parsed, trial_iv, "trial", baseline_ms, fix_trial, sac_trial, blink_trial, pupil_valid_requires_gaze, pupil_min_value),
+    phase_report = interval_report(parsed, phase_iv, "phase", baseline_ms, fix_phase, sac_phase, blink_phase, pupil_valid_requires_gaze, pupil_min_value),
+    fixation_report_raw = parsed$fixations,
+    fixation_interval_report = fix_phase,
+    saccade_report_raw = parsed$saccades,
+    saccade_interval_report = sac_phase,
+    blink_report_raw = parsed$blinks,
+    blink_interval_report = blink_phase,
+    pupil_timeseries = pupil_timeseries(parsed, bin_ms, baseline_ms, "phase", "window_start", TRUE, pupil_valid_requires_gaze, pupil_min_value),
+    pupil_timeseries_dv20_full_trial = pupil_timeseries(parsed, 20, baseline_ms, "full_trial", "trial_start", TRUE, pupil_valid_requires_gaze, pupil_min_value),
+    event_report = parsed$events,
+    message_report = parsed$messages,
+    metric_dictionary = metric_dictionary()
+  )
+  reports$fixation_report <- reports$fixation_interval_report
+  reports$saccade_report <- reports$saccade_interval_report
+  reports$blink_report <- reports$blink_interval_report
+  reports$phase_analysis_long <- phase_analysis_long(reports, "loading")
+  reports
 }
 
 metric_dictionary <- function() {
@@ -359,8 +530,8 @@ compute_aoi_report <- function(parsed, aoi, method = "fixation") {
   rows <- list(); sample_period <- parsed$metadata$sample_period_ms
   for (i in seq_len(nrow(parsed$phases))) {
     ph <- parsed$phases[i]
-    fx <- parsed$fixations[start_time >= ph$start_time & start_time <= ph$end_time & trial_id == ph$trial_id]
-    sm <- parsed$samples[time >= ph$start_time & time <= ph$end_time & trial_id == ph$trial_id]
+    fx <- parsed$fixations[interval_overlaps(start_time, end_time, ph$start_time, ph$end_time) & trial_id == ph$trial_id]
+    sm <- apply_sample_validity(parsed$samples[time >= ph$start_time & time < ph$end_time & trial_id == ph$trial_id])
     fx <- assign_aoi(fx, aoi, "start_time", "x", "y"); sm <- assign_aoi(sm, aoi, "time", "gaze_x", "gaze_y")
     for (g in unique(aoi$aoi_group_id)) {
       pattern <- paste0("(^|;)", g, "($|;)")
@@ -369,7 +540,7 @@ compute_aoi_report <- function(parsed, aoi, method = "fixation") {
       fix_hit <- fx[fhit]; sam_hit <- sm[shit]
       visit_count <- if (length(fhit) > 0) sum(fhit & c(TRUE, !head(fhit, -1)), na.rm = TRUE) else 0
       ttff <- if (nrow(fix_hit) > 0) min(fix_hit$start_time) - ph$start_time else NA_real_
-      rows[[length(rows) + 1]] <- data.table::data.table(participant = ph$participant, trial_id = ph$trial_id, condition = ph$condition, phase = ph$phase, phase_instance = ph$phase_instance, aoi_group_id = g, aoi_name = first_non_na(aoi[aoi_group_id == g]$aoi_name, g), method = method, duration_ms = ph$duration, fixation_count = nrow(fix_hit), dwell_time_fixation_ms = safe_sum(fix_hit$duration), dwell_time_sample_ms = ifelse(!is.na(sample_period), nrow(sam_hit) * sample_period, NA_real_), dwell_time_ms = ifelse(method == "sample", ifelse(!is.na(sample_period), nrow(sam_hit) * sample_period, NA_real_), safe_sum(fix_hit$duration)), ttff_ms = ttff, first_fixation_duration_ms = if (nrow(fix_hit) > 0) fix_hit[which.min(start_time)]$duration else NA_real_, visit_count = visit_count, aoi_sample_count = nrow(sam_hit), aoi_sample_proportion = ifelse(nrow(sm) > 0, nrow(sam_hit) / nrow(sm), NA_real_), mean_pupil_in_aoi = safe_mean(sam_hit$pupil))
+      rows[[length(rows) + 1]] <- data.table::data.table(participant = ph$participant, trial_id = ph$trial_id, condition = ph$condition, phase = ph$phase, phase_instance = ph$phase_instance, aoi_group_id = g, aoi_name = first_non_na(aoi[aoi_group_id == g]$aoi_name, g), method = method, duration_ms = ph$duration, fixation_count = nrow(fix_hit), dwell_time_fixation_ms = safe_sum(fix_hit$duration), dwell_time_sample_ms = ifelse(!is.na(sample_period), nrow(sam_hit) * sample_period, NA_real_), dwell_time_ms = ifelse(method == "sample", ifelse(!is.na(sample_period), nrow(sam_hit) * sample_period, NA_real_), safe_sum(fix_hit$duration)), ttff_ms = ttff, first_fixation_duration_ms = if (nrow(fix_hit) > 0) fix_hit[which.min(start_time)]$duration else NA_real_, visit_count = visit_count, aoi_sample_count = nrow(sam_hit), aoi_sample_proportion = ifelse(nrow(sm) > 0, nrow(sam_hit) / nrow(sm), NA_real_), mean_pupil_in_aoi = safe_mean(sam_hit[valid_sample == TRUE]$pupil))
     }
   }
   data.table::rbindlist(rows, fill = TRUE)
@@ -392,6 +563,136 @@ behavior_check <- function(parsed, behavior) {
   chk[, start_unix_diff_ms := question_start_unix - asc_question_start_unix]; chk[, submit_unix_diff_ms := question_submit_unix - asc_question_submit_unix]; chk[, rt_diff_ms := response_time_ms - asc_response_time_ms]
   chk[, status := ifelse(is.na(question_start_unix) | is.na(asc_question_start_unix), "missing_pair", ifelse(abs(start_unix_diff_ms) > 100 | abs(submit_unix_diff_ms) > 100, "timestamp_warning", "ok"))]
   chk
+}
+
+normalize_colnames <- function(x) {
+  y <- tolower(trimws(as.character(x)))
+  y <- gsub("[^a-z0-9]+", "_", y)
+  y <- gsub("^_+|_+$", "", y)
+  y <- gsub("_+", "_", y)
+  make.unique(y, sep = "_")
+}
+
+read_dataviewer_report <- function(file) {
+  need_pkg("data.table")
+  ext <- tolower(tools::file_ext(file))
+  if (ext %in% c("xls", "xlsx")) {
+    need_pkg("readxl")
+    x <- data.table::as.data.table(readxl::read_excel(file))
+  } else if (ext %in% c("csv", "txt", "tsv")) {
+    x <- data.table::fread(file, na.strings = c(".", "", "NA", "NaN"))
+  } else {
+    stop("Unsupported DataViewer report format: ", ext, call. = FALSE)
+  }
+  original <- names(x)
+  names(x) <- normalize_colnames(names(x))
+  attr(x, "column_map") <- data.table::data.table(original_name = original, normalized_name = names(x))
+  x
+}
+
+pick_col <- function(dt, candidates) {
+  hit <- intersect(candidates, names(dt))
+  if (length(hit) == 0) NA_character_ else hit[[1]]
+}
+
+compare_numeric_metric <- function(ours, dv, by_cols, ours_col, dv_candidates, label, tolerance = 0) {
+  if (is.null(dv) || nrow(dv) == 0 || !ours_col %in% names(ours)) return(data.table::data.table(metric = label, status = "missing_dv_or_ours"))
+  dv_col <- pick_col(dv, dv_candidates)
+  if (is.na(dv_col)) return(data.table::data.table(metric = label, status = "missing_dv_column"))
+  common_by <- intersect(by_cols, intersect(names(ours), names(dv)))
+  if (length(common_by) == 0) {
+    ours2 <- data.table::copy(ours)[, row_id := seq_len(.N)]
+    dv2 <- data.table::copy(dv)[, row_id := seq_len(.N)]
+    common_by <- "row_id"
+  } else {
+    ours2 <- data.table::copy(ours)
+    dv2 <- data.table::copy(dv)
+  }
+  out <- merge(ours2[, c(common_by, ours_col), with = FALSE], dv2[, c(common_by, dv_col), with = FALSE], by = common_by, all = TRUE)
+  data.table::setnames(out, c(ours_col, dv_col), c("custom_value", "dv_value"))
+  out[, `:=`(metric = label, diff = as.numeric(custom_value) - as.numeric(dv_value), tolerance = tolerance)]
+  out[, status := fifelse(is.na(diff), "missing_pair", fifelse(abs(diff) <= tolerance, "ok", "diff"))]
+  out[]
+}
+
+compare_with_dataviewer <- function(parsed, reports, dv_trial_file = NULL, dv_message_file = NULL, dv_fixation_file = NULL, dv_saccade_file = NULL, dv_timecourse_file = NULL, out_file = "outputs/dv_alignment_report.xlsx") {
+  need_pkg("data.table")
+  need_pkg("openxlsx")
+  warnings <- list()
+  read_optional <- function(file, name) {
+    if (is.null(file) || is.na(file) || !nzchar(file)) {
+      warnings[[length(warnings) + 1]] <<- data.table::data.table(item = name, warning = "No DataViewer file supplied.")
+      return(data.table::data.table())
+    }
+    if (!file.exists(file)) {
+      warnings[[length(warnings) + 1]] <<- data.table::data.table(item = name, warning = paste("File not found:", file))
+      return(data.table::data.table())
+    }
+    tryCatch(read_dataviewer_report(file), error = function(e) {
+      warnings[[length(warnings) + 1]] <<- data.table::data.table(item = name, warning = conditionMessage(e))
+      data.table::data.table()
+    })
+  }
+  dv_trial <- read_optional(dv_trial_file, "trial_report")
+  dv_message <- read_optional(dv_message_file, "message_report")
+  dv_fix <- read_optional(dv_fixation_file, "fixation_report")
+  dv_sac <- read_optional(dv_saccade_file, "saccade_report")
+  dv_time <- read_optional(dv_timecourse_file, "timecourse_report")
+
+  trial_mapping <- data.table::copy(parsed$trials)
+  trial_mapping[, custom_trial_order := seq_len(.N)]
+  trial_mapping[, dataviewer_trial_index_expected := custom_trial_order + 1L]
+  trial_mapping[, note := "DataViewer Trial 1 is usually UNDEFINED and is excluded from custom formal trials."]
+
+  event_time_compare <- data.table::data.table()
+  if (nrow(dv_message) > 0 && nrow(parsed$events) > 0) {
+    dv_time_col <- pick_col(dv_message, c("time", "trial_time", "message_time", "timestamp"))
+    dv_msg_col <- pick_col(dv_message, c("message", "text", "message_text", "event", "event_name"))
+    if (!is.na(dv_time_col) && !is.na(dv_msg_col)) {
+      ours <- parsed$events[, .(trial_id, event_name, custom_time = time)]
+      dv <- dv_message[, .(dv_time = as.numeric(get(dv_time_col)), dv_text = as.character(get(dv_msg_col)))]
+      dv[, event_name := sub("^.*\\b(EVENT\\s+)?([A-Z_]+).*$", "\\2", dv_text)]
+      event_time_compare <- merge(ours, dv, by = "event_name", allow.cartesian = TRUE)
+      event_time_compare[, diff_ms := custom_time - dv_time]
+      event_time_compare[, status := fifelse(diff_ms == 0, "ok", "diff")]
+    }
+  }
+
+  trial_metric_compare <- compare_numeric_metric(reports$trial_report, dv_trial, c("trial_id", "condition"), "duration_ms", c("duration", "trial_duration", "full_trial_period_duration"), "trial_duration", 1)
+  fixation_count_compare <- compare_numeric_metric(reports$trial_report, dv_trial, c("trial_id", "condition"), "fixation_count", c("fixation_count", "number_of_fixations", "fix_count"), "fixation_count", 0)
+  saccade_count_compare <- compare_numeric_metric(reports$trial_report, dv_trial, c("trial_id", "condition"), "saccade_count", c("saccade_count", "number_of_saccades", "sac_count"), "saccade_count", 0)
+  blink_count_compare <- compare_numeric_metric(reports$trial_report, dv_trial, c("trial_id", "condition"), "blink_count", c("blink_count", "number_of_blinks"), "blink_count", 0)
+  pupil_mean_compare <- compare_numeric_metric(reports$trial_report, dv_trial, c("trial_id", "condition"), "mean_pupil_area", c("average_pupil_size", "mean_pupil_area", "pupil_size_mean", "mean_pupil"), "pupil_mean", 1)
+
+  timecourse_compare <- data.table::data.table()
+  if (nrow(dv_time) > 0 && !is.null(reports$pupil_timeseries_dv20_full_trial)) {
+    ours_ts <- reports$pupil_timeseries_dv20_full_trial
+    timecourse_compare <- data.table::data.table(
+      custom_bin_count = nrow(ours_ts),
+      dv_bin_count = nrow(dv_time),
+      bin_count_diff = nrow(ours_ts) - nrow(dv_time),
+      note = "Use pupil_timeseries(..., bin_ms = 20, interval_mode = 'full_trial', align_to = 'trial_start') for DataViewer Full Trial Period comparison."
+    )
+  }
+
+  if (nrow(dv_fix) > 0) warnings[[length(warnings) + 1]] <- data.table::data.table(item = "fixation_report", warning = paste("DV fixation rows read:", nrow(dv_fix), "custom raw rows:", nrow(reports$fixation_report_raw)))
+  if (nrow(dv_sac) > 0) warnings[[length(warnings) + 1]] <- data.table::data.table(item = "saccade_report", warning = paste("DV saccade rows read:", nrow(dv_sac), "custom raw rows:", nrow(reports$saccade_report_raw)))
+  warning_dt <- if (length(warnings) > 0) data.table::rbindlist(warnings, fill = TRUE) else data.table::data.table(item = "all", warning = "No warnings.")
+  sheets <- list(
+    trial_mapping = trial_mapping,
+    event_time_compare = event_time_compare,
+    trial_metric_compare = trial_metric_compare,
+    fixation_count_compare = fixation_count_compare,
+    saccade_count_compare = saccade_count_compare,
+    blink_count_compare = blink_count_compare,
+    pupil_mean_compare = pupil_mean_compare,
+    timecourse_compare = timecourse_compare,
+    warnings = warning_dt
+  )
+  dir.create(dirname(out_file), showWarnings = FALSE, recursive = TRUE)
+  export_xlsx(sheets, out_file)
+  attr(sheets, "out_file") <- out_file
+  sheets
 }
 
 export_xlsx <- function(reports, file) {

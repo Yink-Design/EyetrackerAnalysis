@@ -100,6 +100,50 @@ nrow(parsed$trials)
 
 然后与 `data/demo/FM164641_expected_counts.csv` 对比。
 
+## DataViewer 对齐检查
+
+本项目现在提供 DataViewer 4.2.1 对齐检查入口，用于把自编 R 报表与 DataViewer 导出的 Trial Report、Message Report、Fixation Report、Saccade Report 和 Time Course Report 做并排比较。
+
+在 R 中运行：
+
+```r
+source("R/core.R", encoding = "UTF-8")
+parsed <- parse_asc("data/demo/FM164641.asc")
+reports <- compute_reports(parsed)
+
+compare_with_dataviewer(
+  parsed = parsed,
+  reports = reports,
+  dv_trial_file = "data/dv_exports/trialreport_FM121120.xls",
+  dv_message_file = "data/dv_exports/mesreport_FM121120.xls",
+  dv_fixation_file = "data/dv_exports/fixreport.xls",
+  dv_saccade_file = "data/dv_exports/sacreport_FM121120.xls",
+  dv_timecourse_file = "data/dv_exports/timecourseReport_FM121120.xls",
+  out_file = "outputs/dv_alignment_report.xlsx"
+)
+```
+
+在 Shiny 中，先上传并解析 ASC，再进入 **DataViewer 对齐检查** 页，分别上传 DataViewer 的五类 report，点击“运行对齐检查”，然后下载 `dv_alignment_report.xlsx`。
+
+## 关键对齐规则
+
+- Fixation / Saccade / Blink 现在按半开区间重叠 `[start, end)` 归入 trial / phase，而不是只看事件起点。
+- 跨越 trial 或 phase 边界的事件会被裁剪，并输出 `*_interval_report`。
+- `fixation_report_raw` / `saccade_report_raw` / `blink_report_raw` 保留 EyeLink 原始事件。
+- Pupil 指标默认使用 `valid_sample = valid_gaze & valid_pupil`，其中 pupil 必须有限且大于 0。
+- Time Course 支持 DataViewer Full Trial Period 对齐模式：`pupil_timeseries(parsed, bin_ms = 20, interval_mode = "full_trial", align_to = "trial_start")`。
+
+## 正式分析长表
+
+`compute_reports(parsed)` 会生成 `phase_analysis_long`，默认保留 `phase == "loading"` 的正式加载分析窗口，包含 trial、condition、duration_level、fixation、saccade、blink 和 pupil 指标，可直接用于后续统计建模。
+
+## 测试脚本
+
+```r
+source("scripts/check_demo_alignment.R")
+testthat::test_dir("tests/testthat")
+```
+
 通过核心解析后，再运行：
 
 ```r

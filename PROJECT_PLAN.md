@@ -732,7 +732,36 @@ metric_dictionary
 
 ---
 
-## 14. 项目边界
+## 15. 2026-05-28 DataViewer 对齐开发记录
+
+### 已完成
+
+- [x] 读取 `README.md` 与 `PROJECT_PLAN.md` 后继续开发。
+- [x] 新增 `interval_overlaps()` 与 `clip_interval()`，统一使用半开区间 `[start, end)`。
+- [x] 新增 `clip_events_to_intervals()`，生成 fixation / saccade / blink 的窗口裁剪长表。
+- [x] `trial_report` 与 `phase_report` 改为基于裁剪事件统计 count、duration、latency。
+- [x] 新增 `fixation_report_raw`、`fixation_interval_report`、`saccade_report_raw`、`saccade_interval_report`、`blink_report_raw`、`blink_interval_report`。
+- [x] 修复 pupil 有效样本规则：默认 `valid_sample = valid_gaze & valid_pupil`，且 pupil 必须有限并大于 0。
+- [x] `pupil_timeseries()` 支持 `interval_mode = "phase"` / `"full_trial"` 与 `align_to = "window_start"` / `"trial_start"` / `"loading_start"`。
+- [x] `build_phases()` 明确输出 `loading`、`viewer_clean`、`question`、`progressive_usable`、`trial_total`。
+- [x] 新增 `duration_level`，按同一 condition 内 loading duration 自动标记 short / long。
+- [x] 新增 `phase_analysis_long`，默认用于 loading 主分析窗口。
+- [x] 新增 DataViewer report 读取和对齐报告函数：`read_dataviewer_report()`、`compare_with_dataviewer()`。
+- [x] Shiny 新增 **DataViewer 对齐检查** 页，可上传 DV reports 并下载 `dv_alignment_report.xlsx`。
+- [x] 新增 `scripts/check_demo_alignment.R` 和 `tests/testthat` 测试。
+- [x] Demo 基础解析、对齐脚手架和 testthat 测试已在本地 R 4.5.3 通过。
+
+### 仍需真实 DataViewer 导出文件继续校准
+
+- [ ] 用 FM121120 的 DataViewer Trial / Message / Fixation / Saccade / Time Course reports 实测列名映射。
+- [ ] 根据真实 DV Trial Report 列名完善 metric compare 的自动匹配。
+- [ ] 逐项验证 T001-T006 对应 DV Trial 2-7。
+- [ ] 量化 pupil mean 在不同有效样本模式下的差异，并在 report 中自动选择最接近 DV 的模式。
+- [ ] 对 Time Course 做逐 bin pupil 差异比较，而不只是 bin 数摘要。
+
+---
+
+## 16. 项目边界
 
 本项目当前阶段的重点不是完整复制 DataViewer 的全部交互体验，而是实现以下目标：
 
