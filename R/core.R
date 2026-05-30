@@ -67,10 +67,73 @@ empty_dt <- function(cols) {
   dt
 }
 
+safe_utf8 <- function(x) {
+  if (!is.character(x)) return(x)
+  y <- iconv(x, from = "", to = "UTF-8", sub = "byte")
+  y[is.na(y) & !is.na(x)] <- "<invalid encoding>"
+  y
+}
+
+sanitize_dt_utf8 <- function(dt) {
+  if (is.null(dt) || !is.data.frame(dt) || nrow(dt) == 0) return(dt)
+  out <- data.table::copy(data.table::as.data.table(dt))
+  for (nm in names(out)) if (is.character(out[[nm]])) out[, (nm) := safe_utf8(get(nm))]
+  out
+}
+
+sanitize_list_utf8 <- function(x) {
+  if (is.list(x)) {
+    for (nm in names(x)) {
+      if (is.character(x[[nm]])) x[[nm]] <- safe_utf8(x[[nm]])
+      if (is.list(x[[nm]]) && !is.data.frame(x[[nm]])) x[[nm]] <- sanitize_list_utf8(x[[nm]])
+    }
+  }
+  x
+}
+
+read_lines_with_encoding <- function(file, encoding) {
+  warned <- FALSE
+  lines <- tryCatch(
+    withCallingHandlers(
+      readLines(file, warn = FALSE, encoding = encoding),
+      warning = function(w) {
+        warned <<- TRUE
+        invokeRestart("muffleWarning")
+      }
+    ),
+    error = function(e) character()
+  )
+  list(lines = lines, warned = warned)
+}
+
+read_lines_raw_utf8_safe <- function(file) {
+  size <- file.info(file)$size
+  if (is.na(size) || size <= 0) return(character())
+  raw <- readBin(file, what = "raw", n = size)
+  txt <- rawToChar(raw)
+  Encoding(txt) <- "bytes"
+  lines <- strsplit(txt, "\n", fixed = TRUE, useBytes = TRUE)[[1]]
+  sub("\r$", "", lines, useBytes = TRUE)
+}
+
+read_asc_lines <- function(file) {
+  has_trials <- function(x) any(grepl("^MSG\\s+[0-9]+\\s+TRIALID\\s+", x), na.rm = TRUE)
+  score_lines <- function(x) sum(!is.na(x)) + ifelse(has_trials(x), 1000000, 0)
+
+  utf8 <- read_lines_with_encoding(file, "UTF-8")
+  if (!utf8$warned && length(utf8$lines) > 0) return(utf8$lines)
+
+  gb18030 <- read_lines_with_encoding(file, "GB18030")
+  latin1 <- read_lines_with_encoding(file, "latin1")
+  raw <- read_lines_raw_utf8_safe(file)
+  fallback <- list(gb18030$lines, latin1$lines, raw, utf8$lines)
+  fallback[[which.max(vapply(fallback, score_lines, numeric(1)))]]
+}
+
 parse_asc <- function(file, keep_samples = TRUE, progress = NULL) {
   need_pkg("data.table")
   if (is.function(progress)) progress("读取 ASC 文本", 0.02)
-  lines <- readLines(file, warn = FALSE, encoding = "UTF-8")
+  lines <- read_asc_lines(file)
   if (is.function(progress)) progress("解析 metadata", 0.08)
   metadata <- parse_metadata(lines, file)
   if (is.function(progress)) progress("解析 MSG / TRIALID / TRIAL_VAR", 0.14)
@@ -91,6 +154,10 @@ parse_asc <- function(file, keep_samples = TRUE, progress = NULL) {
   if (is.function(progress)) progress("归属 trial / phase", 0.92)
   parsed <- assign_trial_phase(parsed)
   parsed$metadata$participant <- first_non_na(parsed$trials$participant, parsed$metadata$participant)
+  parsed$metadata <- sanitize_list_utf8(parsed$metadata)
+  for (nm in c("messages", "events", "trials", "phases", "samples", "fixations", "saccades", "blinks")) {
+    parsed[[nm]] <- sanitize_dt_utf8(parsed[[nm]])
+  }
   if (is.function(progress)) progress("ASC 解析完成", 1)
   parsed
 }
@@ -254,7 +321,10 @@ build_phases <- function(parsed) {
     vs <- first_non_na(ev[event_name == "VIEWER_ENTER"]$time, NA_real_); ve <- first_non_na(ev[event_name == "VIEWER_EXIT"]$time, tr$trial_end[i])
     first_qs <- first_non_na(ev[event_name == "QUESTION_START"]$time, NA_real_)
     viewer_clean_end <- if (!is.na(first_qs)) first_qs else ve
-    rows <- add_phase(rows, tr$participant[i], tid, tr$condition[i], "viewer_clean", "viewer_enter_to_question", vs, viewer_clean_end)
+    viewer_clean_start <- max(c(vs, le), na.rm = TRUE)
+    if (is.finite(viewer_clean_start)) {
+      rows <- add_phase(rows, tr$participant[i], tid, tr$condition[i], "viewer_clean", "viewer_loaded_to_question", viewer_clean_start, viewer_clean_end)
+    }
     ps <- first_non_na(ev[event_name == "PROGRESSIVE_USABLE"]$time, NA_real_)
     rows <- add_phase(rows, tr$participant[i], tid, tr$condition[i], "progressive_usable", "progressive_usable_to_complete", ps, le)
     qs <- ev[event_name == "QUESTION_START"]
@@ -329,8 +399,15 @@ trial_intervals <- function(parsed) {
 
 add_duration_level <- function(trials, phases) {
   tr <- data.table::copy(trials)
-  if (is.null(tr) || nrow(tr) == 0) return(tr)
-  ld <- phases[phase == "loading", .(trial_id, actual_loading_ms = duration)]
+  if (is.null(tr) || nrow(tr) == 0) {
+    return(empty_dt(c("trial_id", "participant", "condition", "trial_start", "trial_end", "duration", "duration_level", "actual_loading_ms")))
+  }
+  if (!"condition" %in% names(tr)) tr[, condition := NA_character_]
+  if (is.null(phases) || nrow(phases) == 0 || !all(c("phase", "trial_id", "duration") %in% names(phases))) {
+    ld <- empty_dt(c("trial_id", "actual_loading_ms"))
+  } else {
+    ld <- phases[phase == "loading", .(trial_id, actual_loading_ms = duration)]
+  }
   tr <- merge(tr, ld, by = "trial_id", all.x = TRUE)
   tr[, duration_level := NA_character_]
   tr[!is.na(actual_loading_ms), duration_level := {
@@ -698,7 +775,11 @@ compare_with_dataviewer <- function(parsed, reports, dv_trial_file = NULL, dv_me
 export_xlsx <- function(reports, file) {
   need_pkg("openxlsx")
   wb <- openxlsx::createWorkbook()
-  for (nm in names(reports)) if (is.data.frame(reports[[nm]])) { sheet <- substr(gsub("[^A-Za-z0-9_]+", "_", nm), 1, 31); openxlsx::addWorksheet(wb, sheet); openxlsx::writeData(wb, sheet, reports[[nm]]) }
+  for (nm in names(reports)) if (is.data.frame(reports[[nm]])) {
+    sheet <- substr(gsub("[^A-Za-z0-9_]+", "_", nm), 1, 31)
+    openxlsx::addWorksheet(wb, sheet)
+    openxlsx::writeData(wb, sheet, sanitize_dt_utf8(reports[[nm]]))
+  }
   openxlsx::saveWorkbook(wb, file, overwrite = TRUE); file
 }
 
@@ -708,7 +789,7 @@ plot_timeline <- function(parsed, trial_id = "") {
   if (nzchar(trial_id)) { ph <- ph[ph$trial_id == trial_id]; ev <- ev[ev$trial_id == trial_id] }
   if (nrow(ph) == 0) return(ggplot2::ggplot() + ggplot2::ggtitle("无 phase 数据"))
   t0 <- min(ph$start_time); ph[, `:=`(rel_start = (start_time - t0) / 1000, rel_end = (end_time - t0) / 1000)]; ev[, rel_time := (time - t0) / 1000]
-  ggplot2::ggplot() + ggplot2::geom_segment(data = ph, ggplot2::aes(x = rel_start, xend = rel_end, y = phase_instance, yend = phase_instance, linewidth = phase)) + ggplot2::geom_point(data = ev, ggplot2::aes(x = rel_time, y = event_name), size = 1.8) + ggplot2::labs(x = "相对时间 / 秒", y = "事件 / 阶段", title = "事件时间线") + ggplot2::theme_minimal()
+  ggplot2::ggplot() + ggplot2::geom_segment(data = ph, ggplot2::aes(x = rel_start, xend = rel_end, y = phase_instance, yend = phase_instance), linewidth = 1.2) + ggplot2::geom_point(data = ev, ggplot2::aes(x = rel_time, y = event_name), size = 1.8) + ggplot2::labs(x = "相对时间 / 秒", y = "事件 / 阶段", title = "事件时间线") + ggplot2::theme_minimal()
 }
 
 plot_scanpath <- function(parsed, trial_id = "", phase = "") {

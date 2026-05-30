@@ -74,7 +74,7 @@ safe_timeline <- function(parsed, trial_id = "") {
   ph[, `:=`(rel_start = (start_time - t0) / 1000, rel_end = (end_time - t0) / 1000)]
   ev[, rel_time := (time - t0) / 1000]
   ggplot() +
-    geom_segment(data = ph, aes(x = rel_start, xend = rel_end, y = phase_instance, yend = phase_instance, linewidth = phase), color = "#2A6FBB") +
+    geom_segment(data = ph, aes(x = rel_start, xend = rel_end, y = phase_instance, yend = phase_instance), linewidth = 1.2, color = "#2A6FBB") +
     geom_point(data = ev, aes(x = rel_time, y = event_name), size = 1.8, color = "#B84A62") +
     labs(x = "相对时间 / 秒", y = "事件 / 阶段", title = "事件时间线") +
     theme_minimal()
@@ -110,11 +110,39 @@ safe_pupil_curve <- function(reports, trial_id = "", phase = "") {
   if (is.null(ts) || nrow(ts) == 0) return(ggplot() + ggtitle("无瞳孔时间序列"))
   if (nzchar(trial_id)) ts <- ts[ts$trial_id == trial_id]
   if (nzchar(phase)) ts <- ts[ts$phase == phase]
+  if (!nzchar(phase) && "phase" %in% names(ts)) ts <- ts[phase != "trial_total"]
   if (nrow(ts) == 0) return(ggplot() + ggtitle("当前筛选下无瞳孔时间序列"))
-  ggplot(ts, aes(x = bin_start / 1000, y = baseline_corrected_pupil_area, color = phase)) +
+  ph <- copy(reports$phase_report)
+  tr <- copy(reports$trial_report)
+  if (!is.null(ph) && nrow(ph) > 0 && !is.null(tr) && nrow(tr) > 0) {
+    phase_start <- ph[, .(trial_id, phase, phase_instance, phase_start_time = start_time)]
+    trial_start <- tr[, .(trial_id, trial_start_time = start_time)]
+    ts <- merge(ts, phase_start, by = c("trial_id", "phase", "phase_instance"), all.x = TRUE)
+    ts <- merge(ts, trial_start, by = "trial_id", all.x = TRUE)
+    ts[, plot_time_sec := (phase_start_time - trial_start_time + bin_mid) / 1000]
+  } else {
+    ts[, plot_time_sec := bin_mid / 1000]
+  }
+  if (!nzchar(phase)) {
+    ts[, plot_bin := round(plot_time_sec * 1000)]
+    ts[, phase_priority := fifelse(phase == "viewer_clean", 1L,
+      fifelse(phase == "loading", 2L,
+        fifelse(phase == "progressive_usable", 3L,
+          fifelse(phase == "question", 4L, 0L)
+        )
+      )
+    )]
+    setorder(ts, trial_id, plot_bin, phase_priority)
+    ts <- ts[, .SD[.N], by = .(trial_id, plot_bin)]
+    ts[, curve_id := trial_id]
+  } else {
+    ts[, curve_id := interaction(trial_id, phase_instance, drop = TRUE)]
+  }
+
+  ggplot(ts, aes(x = plot_time_sec, y = baseline_corrected_pupil_area, color = phase, group = curve_id)) +
     geom_line(linewidth = 0.55, na.rm = TRUE) +
     facet_wrap(~ trial_id, scales = "free_x") +
-    labs(x = "阶段内时间 / 秒", y = "基线校正瞳孔面积", title = "瞳孔变化曲线") +
+    labs(x = "Trial 内连续时间 / 秒", y = "基线校正瞳孔面积", title = "瞳孔变化曲线") +
     theme_minimal()
 }
 
