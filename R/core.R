@@ -567,10 +567,10 @@ metric_dictionary <- function() {
 
 normalize_aoi <- function(aoi) {
   need_pkg("data.table")
-  req <- c("aoi_group_id","aoi_name","shape_id","shape_type","x_min","y_min","x_max","y_max","center_x","center_y","radius","participant","trial_id","condition","phase","time_start","time_end","priority","enabled")
+  req <- c("aoi_group_id","aoi_name","shape_id","reference_id","shape_type","x_min","y_min","x_max","y_max","center_x","center_y","radius","participant","trial_id","condition","phase","time_start","time_end","time_start_event","time_end_event","priority","enabled")
   for (nm in req) if (!nm %in% names(aoi)) aoi[[nm]] <- NA
   aoi <- data.table::as.data.table(aoi)[, ..req]
-  for (nm in c("aoi_group_id","aoi_name","shape_id","shape_type","participant","trial_id","condition","phase")) { aoi[[nm]] <- as.character(aoi[[nm]]); aoi[[nm]][is.na(aoi[[nm]])] <- "" }
+  for (nm in c("aoi_group_id","aoi_name","shape_id","reference_id","shape_type","participant","trial_id","condition","phase","time_start_event","time_end_event")) { aoi[[nm]] <- as.character(aoi[[nm]]); aoi[[nm]][is.na(aoi[[nm]])] <- "" }
   for (nm in c("x_min","y_min","x_max","y_max","center_x","center_y","radius","time_start","time_end","priority")) aoi[[nm]] <- as_num(aoi[[nm]])
   if (!is.logical(aoi$enabled)) aoi[, enabled := !(tolower(as.character(enabled)) %in% c("false","0","no","否"))]
   aoi[is.na(enabled), enabled := TRUE]; aoi[is.na(priority), priority := 0]
@@ -592,6 +592,7 @@ assign_aoi <- function(points, aoi, time_col, x_col, y_col) {
     sh <- aoi[i]; hit <- point_in_shape(pts[[x_col]], pts[[y_col]], sh)
     if (!is.na(sh$time_start)) hit <- hit & pts[[time_col]] >= sh$time_start
     if (!is.na(sh$time_end)) hit <- hit & pts[[time_col]] <= sh$time_end
+    if (sh$participant != "" && "participant" %in% names(pts)) hit <- hit & pts$participant == sh$participant
     if (sh$trial_id != "" && "trial_id" %in% names(pts)) hit <- hit & pts$trial_id == sh$trial_id
     if (sh$condition != "" && "condition" %in% names(pts)) hit <- hit & pts$condition == sh$condition
     if (sh$phase != "" && sh$phase != "all" && "phase" %in% names(pts)) hit <- hit & pts$phase == sh$phase
@@ -601,23 +602,70 @@ assign_aoi <- function(points, aoi, time_col, x_col, y_col) {
   pts
 }
 
+aoi_matches_value <- function(value, target) {
+  value <- value %||% ""
+  target <- target %||% ""
+  vapply(strsplit(as.character(value), "\\s*[;,|]\\s*"), function(vals) {
+    vals <- trimws(vals)
+    length(vals) == 0 || any(vals == "") || any(tolower(vals) == "all") || target %in% vals
+  }, logical(1))
+}
+
+aoi_for_phase <- function(aoi, ph) {
+  if (nrow(aoi) == 0) return(aoi)
+  aoi[
+    aoi_matches_value(participant, ph$participant) &
+      aoi_matches_value(trial_id, ph$trial_id) &
+      aoi_matches_value(condition, ph$condition) &
+      aoi_matches_value(phase, ph$phase)
+  ]
+}
+
+resolve_aoi_event_time <- function(parsed, ph, spec, fallback = NA_real_) {
+  spec <- trimws(spec %||% "")
+  if (!nzchar(spec) || tolower(spec) %in% c("manual", "absolute")) return(fallback)
+  if (spec == "phase_start") return(ph$start_time)
+  if (spec == "phase_end") return(ph$end_time)
+  if (spec == "trial_start") return(first_non_na(parsed$trials[trial_id == ph$trial_id]$trial_start, fallback))
+  if (spec == "trial_end") return(first_non_na(parsed$trials[trial_id == ph$trial_id]$trial_end, fallback))
+  ev <- parsed$events[trial_id == ph$trial_id]
+  target_q <- NA_character_
+  target_event <- spec
+  m <- regmatches(spec, regexec("^(.+)_q([0-9]+)$", spec))[[1]]
+  if (length(m) >= 3) {
+    target_event <- m[2]
+    target_q <- m[3]
+  }
+  hit <- ev[event_name == target_event]
+  if (!is.na(target_q)) hit <- hit[q == target_q]
+  first_non_na(hit$time, fallback)
+}
+
 compute_aoi_report <- function(parsed, aoi, method = "fixation") {
   aoi <- normalize_aoi(aoi); aoi <- aoi[enabled == TRUE]
   if (nrow(aoi) == 0) return(data.table::data.table())
   rows <- list(); sample_period <- parsed$metadata$sample_period_ms
   for (i in seq_len(nrow(parsed$phases))) {
     ph <- parsed$phases[i]
+    phase_aoi <- aoi_for_phase(aoi, ph)
+    if (nrow(phase_aoi) == 0) next
     fx <- parsed$fixations[interval_overlaps(start_time, end_time, ph$start_time, ph$end_time) & trial_id == ph$trial_id]
     sm <- apply_sample_validity(parsed$samples[time >= ph$start_time & time < ph$end_time & trial_id == ph$trial_id])
-    fx <- assign_aoi(fx, aoi, "start_time", "x", "y"); sm <- assign_aoi(sm, aoi, "time", "gaze_x", "gaze_y")
-    for (g in unique(aoi$aoi_group_id)) {
+    assign_shapes <- data.table::copy(phase_aoi)
+    for (j in seq_len(nrow(assign_shapes))) {
+      if (nzchar(assign_shapes$time_start_event[j])) assign_shapes$time_start[j] <- resolve_aoi_event_time(parsed, ph, assign_shapes$time_start_event[j], assign_shapes$time_start[j])
+      if (nzchar(assign_shapes$time_end_event[j])) assign_shapes$time_end[j] <- resolve_aoi_event_time(parsed, ph, assign_shapes$time_end_event[j], assign_shapes$time_end[j])
+    }
+    assign_shapes[, `:=`(participant = "", trial_id = "", condition = "", phase = "")]
+    fx <- assign_aoi(fx, assign_shapes, "start_time", "x", "y"); sm <- assign_aoi(sm, assign_shapes, "time", "gaze_x", "gaze_y")
+    for (g in unique(phase_aoi$aoi_group_id)) {
       pattern <- paste0("(^|;)", g, "($|;)")
       fhit <- if (nrow(fx) > 0) !is.na(fx$aoi_group) & grepl(pattern, fx$aoi_group) else logical()
       shit <- if (nrow(sm) > 0) !is.na(sm$aoi_group) & grepl(pattern, sm$aoi_group) else logical()
       fix_hit <- fx[fhit]; sam_hit <- sm[shit]
       visit_count <- if (length(fhit) > 0) sum(fhit & c(TRUE, !head(fhit, -1)), na.rm = TRUE) else 0
       ttff <- if (nrow(fix_hit) > 0) min(fix_hit$start_time) - ph$start_time else NA_real_
-      rows[[length(rows) + 1]] <- data.table::data.table(participant = ph$participant, trial_id = ph$trial_id, condition = ph$condition, phase = ph$phase, phase_instance = ph$phase_instance, aoi_group_id = g, aoi_name = first_non_na(aoi[aoi_group_id == g]$aoi_name, g), method = method, duration_ms = ph$duration, fixation_count = nrow(fix_hit), dwell_time_fixation_ms = safe_sum(fix_hit$duration), dwell_time_sample_ms = ifelse(!is.na(sample_period), nrow(sam_hit) * sample_period, NA_real_), dwell_time_ms = ifelse(method == "sample", ifelse(!is.na(sample_period), nrow(sam_hit) * sample_period, NA_real_), safe_sum(fix_hit$duration)), ttff_ms = ttff, first_fixation_duration_ms = if (nrow(fix_hit) > 0) fix_hit[which.min(start_time)]$duration else NA_real_, visit_count = visit_count, aoi_sample_count = nrow(sam_hit), aoi_sample_proportion = ifelse(nrow(sm) > 0, nrow(sam_hit) / nrow(sm), NA_real_), mean_pupil_in_aoi = safe_mean(sam_hit[valid_sample == TRUE]$pupil))
+      rows[[length(rows) + 1]] <- data.table::data.table(participant = ph$participant, trial_id = ph$trial_id, condition = ph$condition, phase = ph$phase, phase_instance = ph$phase_instance, aoi_group_id = g, aoi_name = first_non_na(phase_aoi[aoi_group_id == g]$aoi_name, g), method = method, duration_ms = ph$duration, fixation_count = nrow(fix_hit), dwell_time_fixation_ms = safe_sum(fix_hit$duration), dwell_time_sample_ms = ifelse(!is.na(sample_period), nrow(sam_hit) * sample_period, NA_real_), dwell_time_ms = ifelse(method == "sample", ifelse(!is.na(sample_period), nrow(sam_hit) * sample_period, NA_real_), safe_sum(fix_hit$duration)), ttff_ms = ttff, first_fixation_duration_ms = if (nrow(fix_hit) > 0) fix_hit[which.min(start_time)]$duration else NA_real_, visit_count = visit_count, aoi_sample_count = nrow(sam_hit), aoi_sample_proportion = ifelse(nrow(sm) > 0, nrow(sam_hit) / nrow(sm), NA_real_), mean_pupil_in_aoi = safe_mean(sam_hit[valid_sample == TRUE]$pupil))
     }
   }
   data.table::rbindlist(rows, fill = TRUE)
@@ -625,6 +673,24 @@ compute_aoi_report <- function(parsed, aoi, method = "fixation") {
 
 read_behavior <- function(file) {
   b <- data.table::fread(file, encoding = "UTF-8")
+  nms <- names(b)
+  lower <- tolower(nms)
+  rename_if_present <- function(from, to) {
+    hit <- which(lower %in% tolower(from))[1]
+    if (!is.na(hit) && !to %in% names(b)) data.table::setnames(b, nms[hit], to)
+  }
+  rename_if_present(c("ParticipantID", "participant_id"), "participant")
+  rename_if_present(c("TrialID", "trial"), "trial_id")
+  rename_if_present(c("LoadingCondition", "condition"), "condition")
+  if (!"question_id" %in% names(b) && "QuestionIndex" %in% names(b)) b[, question_id := paste0("q", QuestionIndex)]
+  if (!"question_id" %in% names(b) && "questionindex" %in% tolower(names(b))) {
+    q_col <- names(b)[tolower(names(b)) == "questionindex"][1]
+    b[, question_id := paste0("q", get(q_col))]
+  }
+  rename_if_present(c("QuestionStartUnixMs"), "question_start_unix")
+  rename_if_present(c("QuestionSubmitUnixMs"), "question_submit_unix")
+  rename_if_present(c("QuestionDuration"), "response_time_ms")
+  rename_if_present(c("SelectedOptionLabel", "selected_answer"), "selected_answer")
   for (nm in c("participant","trial_id","condition","question_id","question_start_unix","question_submit_unix","response_time_ms","selected_answer","correct_answer","accuracy")) if (!nm %in% names(b)) b[[nm]] <- NA
   b[, question_start_unix := as_num(question_start_unix)]; b[, question_submit_unix := as_num(question_submit_unix)]; b[, response_time_ms := as_num(response_time_ms)]; b[, accuracy := as_num(accuracy)]
   b

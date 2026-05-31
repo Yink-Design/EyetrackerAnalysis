@@ -19,11 +19,11 @@ source("global.R", encoding = "UTF-8")
 source("R/core.R", encoding = "UTF-8")
 
 empty_aoi <- function() data.table(
-  aoi_group_id = character(), aoi_name = character(), shape_id = character(), shape_type = character(),
+  aoi_group_id = character(), aoi_name = character(), shape_id = character(), reference_id = character(), shape_type = character(),
   x_min = numeric(), y_min = numeric(), x_max = numeric(), y_max = numeric(),
   center_x = numeric(), center_y = numeric(), radius = numeric(),
   participant = character(), trial_id = character(), condition = character(), phase = character(),
-  time_start = numeric(), time_end = numeric(), priority = numeric(), enabled = logical()
+  time_start = numeric(), time_end = numeric(), time_start_event = character(), time_end_event = character(), priority = numeric(), enabled = logical()
 )
 
 with_source <- function(reports, source_file) {
@@ -42,6 +42,10 @@ read_reference_image <- function(path) {
   as.raster(img)
 }
 
+blank_reference_choices <- function(refs) {
+  c("无参考图" = "", stats::setNames(names(refs), names(refs)))
+}
+
 base_canvas <- function(parsed, reference_image = NULL, title = "") {
   dc <- parsed$metadata$display_coords
   p <- ggplot() +
@@ -54,9 +58,10 @@ base_canvas <- function(parsed, reference_image = NULL, title = "") {
   p
 }
 
-plot_aoi_canvas <- function(parsed, aoi, reference_image = NULL) {
+plot_aoi_canvas <- function(parsed, aoi, reference_image = NULL, reference_id = "") {
   p <- base_canvas(parsed, reference_image, "AOI canvas aligned to DISPLAY_COORDS")
   if (!is.null(aoi) && nrow(aoi) > 0) {
+    if ("reference_id" %in% names(aoi) && nzchar(reference_id %||% "")) aoi <- aoi[reference_id %in% c("", reference_id)]
     rects <- aoi[shape_type == "rectangle"]
     if (nrow(rects) > 0) p <- p + geom_rect(data = rects, aes(xmin = x_min, xmax = x_max, ymin = y_min, ymax = y_max), inherit.aes = FALSE, fill = NA, color = "#2A6FBB", linewidth = 0.8)
     circles <- aoi[shape_type == "circle"]
@@ -217,20 +222,24 @@ ui <- fluidPage(
     sidebarPanel(
       fileInput("asc_files", "上传 ASC 文件（支持多选）", accept = c(".asc", ".txt"), multiple = TRUE),
       helpText("当前单次上传上限约 1GB。大文件解析时会显示分阶段进度。"),
-      fileInput("reference_file", "上传参考图（PNG/JPG，用于 AOI 和叠加图）", accept = c(".png", ".jpg", ".jpeg")),
+      fileInput("reference_file", "上传参考图（PNG/JPG，支持多张）", accept = c(".png", ".jpg", ".jpeg"), multiple = TRUE),
       fileInput("aoi_file", "上传 AOI CSV（可选）", accept = ".csv"),
-      fileInput("behavior_file", "上传答题记录 CSV（可选）", accept = ".csv"),
+      fileInput("behavior_file", "上传答题记录 CSV（可选，支持多选）", accept = ".csv", multiple = TRUE),
       fileInput("project_file", "读取项目 RDS（可选）", accept = ".rds"),
       numericInput("bin_ms", "Time-bin 大小 / ms", value = 100, min = 20, step = 10),
       numericInput("baseline_ms", "瞳孔基线窗口 / ms", value = 500, min = 100, step = 100),
       selectInput("aoi_method", "AOI dwell 计算方法", choices = c("fixation", "sample"), selected = "fixation"),
       actionButton("parse_btn", "解析 / 更新分析", class = "btn-primary"),
+      uiOutput("pending_upload_ui"),
+      uiOutput("behavior_inventory_ui"),
       hr(),
       uiOutput("active_file_ui"),
-      selectInput("trial_select", "Trial", choices = c("All" = "__all__"), selected = "__all__"),
-      selectInput("phase_select", "Phase", choices = c("All" = "__all__"), selected = "__all__"),
+      uiOutput("parsed_file_inventory_ui"),
+      selectInput("trial_select", "当前查看 / 绑定 Trial", choices = c("All" = "__all__"), selected = "__all__"),
+      selectInput("phase_select", "当前查看 Phase", choices = c("All" = "__all__"), selected = "__all__"),
       hr(),
-      downloadButton("download_xlsx", "导出全部 XLSX"),
+      downloadButton("download_xlsx", "导出当前被试 XLSX"),
+      downloadButton("download_all_xlsx", "导出全部被试 ZIP"),
       downloadButton("download_project", "保存项目 RDS")
     ),
     mainPanel(
@@ -239,7 +248,48 @@ ui <- fluidPage(
         tabPanel("数据概览", br(), verbatimTextOutput("status"), h4("Quality Report"), DTOutput("quality_tbl"), h4("Metadata"), DTOutput("metadata_tbl"), h4("Trials"), DTOutput("trials_tbl"), h4("Phases"), DTOutput("phases_tbl")),
         tabPanel("指标说明", br(), DTOutput("metric_tbl")),
         tabPanel("Trial / Phase 分析", br(), verbatimTextOutput("filter_status"), plotlyOutput("timeline_plot", height = 360), plotlyOutput("scanpath_plot", height = 420), plotlyOutput("heatmap_plot", height = 420), plotlyOutput("pupil_plot", height = 360), h4("Trial Report"), DTOutput("trial_report_tbl"), h4("Phase Report"), DTOutput("phase_report_tbl")),
-        tabPanel("AOI 编辑", br(), fluidRow(column(4, textInput("aoi_group", "AOI 组 ID", "aoi_1"), textInput("aoi_name", "AOI 名称", "兴趣区 1"), numericInput("circle_radius", "圆形半径", 80, min = 1), numericInput("aoi_time_start", "AOI 起始时间（可选）", NA), numericInput("aoi_time_end", "AOI 结束时间（可选）", NA), numericInput("aoi_priority", "优先级", 0), checkboxInput("aoi_enabled", "启用 AOI", TRUE), actionButton("add_circle", "在点击位置添加圆形 AOI"), actionButton("clear_aoi", "清空临时 AOI"), downloadButton("download_aoi_csv", "导出 AOI CSV")), column(8, plotOutput("aoi_canvas", height = 560, brush = brushOpts(id = "aoi_brush", resetOnNew = TRUE), click = clickOpts(id = "aoi_click")))), DTOutput("aoi_tbl")),
+        tabPanel("AOI 编辑", br(),
+          fluidRow(
+            column(4,
+              selectInput("reference_select", "参考图", choices = c("无参考图" = ""), selected = ""),
+              textInput("aoi_group", "AOI Group ID", "aoi_1"),
+              textInput("aoi_name", "AOI 名称", "兴趣区 1"),
+              textInput("aoi_shape_id", "Shape ID", ""),
+              selectInput("aoi_participant_bind", "批量规则 Participant（可选）", choices = c("All" = ""), selected = "", multiple = TRUE),
+              selectInput("aoi_condition_bind", "批量规则 Condition（可选）", choices = c("All" = ""), selected = "", multiple = TRUE),
+              selectInput("aoi_trial_bind", "批量规则 Trial（可选）", choices = c("All" = ""), selected = "", multiple = TRUE),
+              selectInput("aoi_phase_bind", "批量规则 Phase（可选）", choices = c("All" = ""), selected = "", multiple = TRUE),
+              selectInput("aoi_time_start_event", "动态起点", choices = c("手动/不使用" = "", "phase_start", "trial_start", "LOADING_START", "PROGRESSIVE_USABLE", "QUESTION_START_q1", "QUESTION_START_q2", "LOADING_COMPLETE", "VIEWER_ENTER"), selected = ""),
+              selectInput("aoi_time_end_event", "动态终点", choices = c("手动/不使用" = "", "phase_end", "trial_end", "LOADING_COMPLETE", "PROGRESSIVE_USABLE", "QUESTION_START_q1", "QUESTION_START_q2", "QUESTION_SUBMIT_q1", "QUESTION_SUBMIT_q2", "VIEWER_EXIT"), selected = ""),
+              numericInput("circle_radius", "圆形半径", 80, min = 1),
+              numericInput("aoi_time_start", "AOI 起始时间（可选）", NA),
+              numericInput("aoi_time_end", "AOI 结束时间（可选）", NA),
+              numericInput("aoi_priority", "优先级", 0),
+              checkboxInput("aoi_enabled", "启用 AOI", TRUE),
+              actionButton("add_circle", "在点击位置添加圆形 AOI"),
+              actionButton("update_aoi", "更新选中 AOI"),
+              actionButton("duplicate_aoi_time", "为选中 AOI 新增时间窗"),
+              actionButton("bind_current_trial_aoi", "绑定到当前被试/Trial"),
+              helpText("拉丁方映射推荐：左侧选择当前 ASC/Trial 后点此按钮，会为该被试-trial 写入一条单独 AOI 记录。上方批量规则只适合所有被试 trial_id 完全一致的情况。"),
+              actionButton("delete_aoi", "删除选中 AOI"),
+              actionButton("clear_aoi", "清空全部 AOI"),
+              downloadButton("download_aoi_csv", "导出 AOI CSV")
+            ),
+            column(8,
+              plotOutput("aoi_canvas", height = 520, brush = brushOpts(id = "aoi_brush", resetOnNew = TRUE), click = clickOpts(id = "aoi_click")),
+              h4("当前 trial/phase 时间标记"),
+              fluidRow(column(6, actionButton("time_to_start", "填入起始时间")), column(6, actionButton("time_to_end", "填入结束时间"))),
+              DTOutput("aoi_time_markers_tbl")
+            )
+          ),
+          DTOutput("aoi_tbl"),
+          h4("选中 AOI 的被试 / Trial 绑定情况"),
+          fluidRow(
+            column(6, actionButton("load_aoi_binding", "载入选中绑定")),
+            column(6, actionButton("delete_aoi_binding", "删除选中绑定"))
+          ),
+          DTOutput("aoi_binding_summary_tbl")
+        ),
         tabPanel("AOI 分析", br(), plotOutput("aoi_overlay_plot", height = 460), h4("AOI Report"), DTOutput("aoi_report_tbl")),
         tabPanel("答题合并", br(), h4("时间戳 / 题目匹配检查"), DTOutput("behavior_check_tbl"), h4("眼动 + 行为综合表"), DTOutput("merged_behavior_tbl"), h4("Condition Summary"), DTOutput("condition_summary_tbl")),
         tabPanel("原始报表", br(), h4("Fixation"), DTOutput("fix_tbl"), h4("Saccade"), DTOutput("sac_tbl"), h4("Blink"), DTOutput("blink_tbl"), h4("Messages / Events"), DTOutput("event_tbl")),
@@ -269,35 +319,72 @@ ui <- fluidPage(
 server <- function(input, output, session) {
   parsed_items <- reactiveVal(list())
   report_items <- reactiveVal(list())
+  parsed_file_info <- reactiveVal(data.table(name = character(), size = numeric()))
   aoi_dt <- reactiveVal(empty_aoi())
+  behavior_items <- reactiveVal(list())
   behavior_dt <- reactiveVal(data.table())
-  reference_img <- reactiveVal(NULL)
+  reference_imgs <- reactiveVal(list())
   dv_alignment <- reactiveVal(list())
   dv_alignment_file <- reactiveVal(NULL)
 
   observeEvent(input$reference_file, {
     req(input$reference_file)
-    reference_img(read_reference_image(input$reference_file$datapath))
+    refs <- reference_imgs()
+    for (i in seq_len(nrow(input$reference_file))) refs[[input$reference_file$name[i]]] <- read_reference_image(input$reference_file$datapath[i])
+    reference_imgs(refs)
+    first_ref <- if (length(refs) > 0) names(refs)[[1]] else ""
+    updateSelectInput(session, "reference_select", choices = blank_reference_choices(refs), selected = input$reference_select %||% first_ref)
+  })
+
+  current_reference_id <- reactive(input$reference_select %||% "")
+  current_reference_img <- reactive({
+    id <- current_reference_id()
+    refs <- reference_imgs()
+    if (!nzchar(id) || is.null(refs[[id]])) NULL else refs[[id]]
   })
 
   observeEvent(input$project_file, {
     req(input$project_file)
     obj <- readRDS(input$project_file$datapath)
+    if (!is.null(obj$parsed_items)) parsed_items(obj$parsed_items)
+    if (!is.null(obj$report_items)) report_items(obj$report_items)
+    if (!is.null(obj$parsed_file_info)) parsed_file_info(as.data.table(obj$parsed_file_info))
     if (!is.null(obj$aoi)) aoi_dt(normalize_aoi(obj$aoi))
     if (!is.null(obj$behavior)) behavior_dt(as.data.table(obj$behavior))
+    if (!is.null(obj$behavior_items)) behavior_items(obj$behavior_items)
+    if (!is.null(obj$reference_imgs)) {
+      reference_imgs(obj$reference_imgs)
+      first_ref <- if (length(obj$reference_imgs) > 0) names(obj$reference_imgs)[[1]] else ""
+      updateSelectInput(session, "reference_select", choices = blank_reference_choices(obj$reference_imgs), selected = first_ref)
+    }
+    if (!is.null(obj$bin_ms)) updateNumericInput(session, "bin_ms", value = obj$bin_ms)
+    if (!is.null(obj$baseline_ms)) updateNumericInput(session, "baseline_ms", value = obj$baseline_ms)
+    if (!is.null(obj$aoi_method)) updateSelectInput(session, "aoi_method", selected = obj$aoi_method)
+    if (!is.null(obj$parsed_items) && length(obj$parsed_items) > 0) {
+      updateSelectInput(session, "active_file", choices = names(obj$parsed_items), selected = names(obj$parsed_items)[[1]])
+    }
   })
 
   observeEvent(input$parse_btn, {
-    req(input$asc_files)
-    parsed_list <- list()
-    reports_list <- list()
-    withProgress(message = "正在解析 ASC...", value = 0, {
-      for (i in seq_len(nrow(input$asc_files))) {
-        label <- input$asc_files$name[i]
-        file_span <- 1 / nrow(input$asc_files)
+    parsed_list <- parsed_items()
+    reports_list <- report_items()
+    if (is.null(parsed_list)) parsed_list <- list()
+    if (is.null(reports_list)) reports_list <- list()
+    current_info <- parsed_file_info()
+    if (is.null(current_info)) current_info <- data.table(name = character(), size = numeric())
+    asc_to_parse <- data.table()
+    if (!is.null(input$asc_files) && nrow(input$asc_files) > 0) {
+      asc_files <- as.data.table(input$asc_files)
+      asc_files[, size := as.numeric(size)]
+      asc_to_parse <- asc_files[!mapply(function(nm, sz) any(current_info$name == nm & current_info$size == sz), name, size)]
+    }
+    if (nrow(asc_to_parse) > 0) withProgress(message = "正在解析 ASC...", value = 0, {
+      for (i in seq_len(nrow(asc_to_parse))) {
+        label <- asc_to_parse$name[i]
+        file_span <- 1 / nrow(asc_to_parse)
         last_parse_value <- 0
         incProgress(file_span * 0.02, detail = paste(label, "准备解析"))
-        p <- parse_asc(input$asc_files$datapath[i], progress = function(detail, value) {
+        p <- parse_asc(asc_to_parse$datapath[i], progress = function(detail, value) {
           value <- max(last_parse_value, min(1, value))
           incProgress((value - last_parse_value) * file_span * 0.76, detail = paste(label, detail))
           last_parse_value <<- value
@@ -306,13 +393,29 @@ server <- function(input, output, session) {
         parsed_list[[label]] <- p
         incProgress(file_span * 0.08, detail = paste(label, "生成统计报表"))
         reports_list[[label]] <- with_source(compute_reports(p, bin_ms = input$bin_ms, baseline_ms = input$baseline_ms), label)
+        current_info <- current_info[name != label]
+        current_info <- rbindlist(list(current_info, data.table(name = label, size = asc_to_parse$size[i])), fill = TRUE)
         incProgress(file_span * 0.14, detail = paste(label, "完成"))
       }
     })
     if (!is.null(input$aoi_file)) aoi_dt(normalize_aoi(fread(input$aoi_file$datapath, encoding = "UTF-8")))
-    if (!is.null(input$behavior_file)) behavior_dt(read_behavior(input$behavior_file$datapath))
+    if (!is.null(input$behavior_file)) {
+      items <- behavior_items()
+      if (is.null(items)) items <- list()
+      for (i in seq_len(nrow(input$behavior_file))) {
+        b <- read_behavior(input$behavior_file$datapath[i])
+        data.table::set(b, j = "source_file", value = input$behavior_file$name[i])
+        items[[input$behavior_file$name[i]]] <- b
+      }
+      behavior_items(items)
+      behavior_dt(rbindlist(items, fill = TRUE))
+    }
     parsed_items(parsed_list)
     report_items(reports_list)
+    parsed_file_info(current_info)
+    if (nrow(asc_to_parse) > 0) {
+      updateSelectInput(session, "active_file", choices = names(parsed_list), selected = asc_to_parse$name[nrow(asc_to_parse)])
+    }
   })
 
   active_name <- reactive({
@@ -333,19 +436,22 @@ server <- function(input, output, session) {
     report_items()[[nm]]
   })
 
-  current_reports <- reactive({
-    p <- active_parsed()
-    rep <- active_reports_base()
+  reports_for_item <- function(p, rep) {
     if (is.null(p) || length(rep) == 0) return(list())
-    rep$aoi_definition <- aoi_dt()
-    rep$aoi_report <- if (nrow(aoi_dt()) > 0) compute_aoi_report(p, aoi_dt(), method = input$aoi_method) else data.table()
+    out <- rep
+    out$aoi_definition <- aoi_dt()
+    out$aoi_report <- if (nrow(aoi_dt()) > 0) compute_aoi_report(p, aoi_dt(), method = input$aoi_method) else data.table()
     if (nrow(behavior_dt()) > 0) {
-      rep$behavior_check_report <- behavior_check(p, behavior_dt())
-      rep$merged_eye_behavior_report <- merge_eye_behavior_report(rep, behavior_dt())
-      rep$condition_summary <- condition_summary(rep$merged_eye_behavior_report)
+      out$behavior_check_report <- behavior_check(p, behavior_dt())
+      out$merged_eye_behavior_report <- merge_eye_behavior_report(out, behavior_dt())
+      out$condition_summary <- condition_summary(out$merged_eye_behavior_report)
     }
-    rep$metric_dictionary <- metric_dictionary()
-    rep
+    out$metric_dictionary <- metric_dictionary()
+    out
+  }
+
+  current_reports <- reactive({
+    reports_for_item(active_parsed(), active_reports_base())
   })
 
   selected_trial <- reactive({
@@ -358,6 +464,29 @@ server <- function(input, output, session) {
     x <- input$phase_select
     if (is.null(x)) x <- "__all__"
     if (identical(x, "__all__")) "" else x
+  })
+
+  bind_value <- function(x) {
+    x <- x %||% ""
+    x <- x[nzchar(x)]
+    if (length(x) == 0) "" else paste(x, collapse = ";")
+  }
+  selected_aoi_participant <- reactive(bind_value(input$aoi_participant_bind))
+  selected_aoi_condition <- reactive(bind_value(input$aoi_condition_bind))
+  selected_aoi_trial <- reactive(bind_value(input$aoi_trial_bind))
+  selected_aoi_phase <- reactive(bind_value(input$aoi_phase_bind))
+
+  active_participant <- reactive({
+    p <- active_parsed()
+    if (is.null(p)) return("")
+    p$metadata$participant %||% ""
+  })
+
+  selected_trial_condition <- reactive({
+    p <- active_parsed()
+    tr <- selected_trial()
+    if (is.null(p) || !nzchar(tr)) return("")
+    first_non_na(p$trials[trial_id == tr]$condition, "")
   })
 
   analysis_view <- reactive({
@@ -378,7 +507,50 @@ server <- function(input, output, session) {
   output$active_file_ui <- renderUI({
     nms <- names(parsed_items())
     if (length(nms) == 0) return(helpText("尚未解析 ASC 文件。"))
-    selectInput("active_file", "当前查看文件", choices = nms, selected = nms[[1]])
+    selected <- input$active_file
+    if (is.null(selected) || !selected %in% nms) selected <- nms[[1]]
+    selectInput("active_file", "当前查看文件", choices = nms, selected = selected)
+  })
+
+  output$pending_upload_ui <- renderUI({
+    files <- input$asc_files
+    if (is.null(files) || nrow(files) == 0) return(helpText("本次未选择新的 ASC；再次浏览只会改变待解析列表，不会清空已解析结果。"))
+    tags$div(
+      tags$small(tags$b("本次待解析 / 追加：")),
+      tags$ul(lapply(files$name, function(x) tags$li(tags$small(x))))
+    )
+  })
+
+  output$behavior_inventory_ui <- renderUI({
+    pending <- input$behavior_file
+    loaded <- names(behavior_items())
+    tags$div(
+      if (!is.null(pending) && nrow(pending) > 0) tags$div(
+        tags$small(tags$b("本次待追加答题 CSV：")),
+        tags$ul(lapply(pending$name, function(x) tags$li(tags$small(x))))
+      ),
+      if (length(loaded) > 0) tags$div(
+        tags$small(tags$b(sprintf("已加载答题 CSV：%d 个", length(loaded)))),
+        tags$ul(lapply(loaded, function(nm) {
+          rows <- nrow(behavior_items()[[nm]])
+          tags$li(tags$small(sprintf("%s | rows: %s", nm, rows)))
+        }))
+      ) else tags$small("尚未加载答题 CSV。")
+    )
+  })
+
+  output$parsed_file_inventory_ui <- renderUI({
+    items <- parsed_items()
+    nms <- names(items)
+    if (length(nms) == 0) return(NULL)
+    tags$div(
+      tags$small(tags$b(sprintf("已解析 ASC：%d 个", length(nms)))),
+      tags$ul(lapply(nms, function(nm) {
+        p <- items[[nm]]
+        label <- sprintf("%s | trials: %s | phases: %s", nm, nrow(p$trials), nrow(p$phases))
+        tags$li(tags$small(label))
+      }))
+    )
   })
 
   observeEvent(active_parsed(), {
@@ -386,6 +558,10 @@ server <- function(input, output, session) {
     if (is.null(p)) return()
     updateSelectInput(session, "trial_select", choices = c("All" = "__all__", unique(p$trials$trial_id)), selected = "__all__")
     updateSelectInput(session, "phase_select", choices = c("All" = "__all__", unique(p$phases$phase)), selected = "__all__")
+    updateSelectInput(session, "aoi_participant_bind", choices = c("All" = "", unique(p$trials$participant)), selected = character())
+    updateSelectInput(session, "aoi_condition_bind", choices = c("All" = "", unique(p$trials$condition)), selected = character())
+    updateSelectInput(session, "aoi_trial_bind", choices = c("All" = "", unique(p$trials$trial_id)), selected = character())
+    updateSelectInput(session, "aoi_phase_bind", choices = c("All" = "", unique(p$phases$phase)), selected = character())
   }, ignoreNULL = TRUE)
 
   output$filter_status <- renderPrint({
@@ -450,14 +626,14 @@ server <- function(input, output, session) {
     req(analysis_view())
     tr <- selected_trial()
     ph <- selected_phase()
-    ggplotly(safe_scanpath(analysis_view()$parsed, "", "", reference_img()), tooltip = c("x", "y", "size", "label")) %>%
+    ggplotly(safe_scanpath(analysis_view()$parsed, "", "", current_reference_img()), tooltip = c("x", "y", "size", "label")) %>%
       layout(dragmode = "zoom", title = list(text = paste("注视路径 - Trial:", ifelse(nzchar(tr), tr, "All"), "Phase:", ifelse(nzchar(ph), ph, "All"))))
   })
   output$heatmap_plot <- renderPlotly({
     req(analysis_view())
     tr <- selected_trial()
     ph <- selected_phase()
-    ggplotly(safe_heatmap(analysis_view()$parsed, "", "", reference_img()), tooltip = c("x", "y", "fill")) %>%
+    ggplotly(safe_heatmap(analysis_view()$parsed, "", "", current_reference_img()), tooltip = c("x", "y", "fill")) %>%
       layout(dragmode = "zoom", title = list(text = paste("眼动热图 - Trial:", ifelse(nzchar(tr), tr, "All"), "Phase:", ifelse(nzchar(ph), ph, "All"))))
   })
   output$pupil_plot <- renderPlotly({
@@ -468,18 +644,153 @@ server <- function(input, output, session) {
       layout(dragmode = "zoom", title = list(text = paste("瞳孔变化曲线 - Trial:", ifelse(nzchar(tr), tr, "All"), "Phase:", ifelse(nzchar(ph), ph, "All"))))
   })
 
+  aoi_time_markers <- reactive({
+    p <- active_parsed()
+    if (is.null(p)) return(data.table())
+    tr <- selected_trial()
+    ph <- selected_phase()
+    phases <- copy(p$phases)
+    events <- copy(p$events)
+    if (nzchar(tr)) {
+      phases <- phases[trial_id == tr]
+      events <- events[trial_id == tr]
+    }
+    if (nzchar(ph)) phases <- phases[phase == ph]
+    phase_marks <- rbindlist(list(
+      phases[, .(source = "phase_start", label = paste(phase_instance, "start"), trial_id, phase, time = start_time)],
+      phases[, .(source = "phase_end", label = paste(phase_instance, "end"), trial_id, phase, time = end_time)]
+    ), fill = TRUE)
+    event_marks <- events[, .(source = "event", label = ifelse(is.na(q) | q == "", event_name, paste0(event_name, "_q", q)), trial_id, phase = NA_character_, time)]
+    out <- rbindlist(list(phase_marks, event_marks), fill = TRUE)
+    if (nrow(out) == 0) return(out)
+    out <- unique(out[is.finite(time)], by = c("source", "label", "trial_id", "time"))
+    setorder(out, trial_id, time, source)
+    out
+  })
+
+  output$aoi_time_markers_tbl <- renderDT({
+    datatable(aoi_time_markers(), selection = "single", rownames = FALSE, options = list(scrollX = TRUE, pageLength = 6))
+  })
+
+  selected_marker_time <- reactive({
+    idx <- input$aoi_time_markers_tbl_rows_selected
+    marks <- aoi_time_markers()
+    if (length(idx) != 1 || nrow(marks) < idx) return(NA_real_)
+    marks$time[idx]
+  })
+
+  observeEvent(input$time_to_start, {
+    t <- selected_marker_time()
+    if (is.finite(t)) updateNumericInput(session, "aoi_time_start", value = t)
+  })
+
+  observeEvent(input$time_to_end, {
+    t <- selected_marker_time()
+    if (is.finite(t)) updateNumericInput(session, "aoi_time_end", value = t)
+  })
+
+  editing_aoi_row <- reactiveVal(NA_integer_)
+
+  selected_aoi_index <- reactive({
+    idx <- editing_aoi_row()
+    if (length(idx) == 1 && nrow(aoi_dt()) >= idx) idx else NA_integer_
+  })
+
+  load_aoi_row_to_inputs <- function(row) {
+    updateTextInput(session, "aoi_group", value = row$aoi_group_id)
+    updateTextInput(session, "aoi_name", value = row$aoi_name)
+    updateTextInput(session, "aoi_shape_id", value = row$shape_id)
+    if ("reference_id" %in% names(row)) updateSelectInput(session, "reference_select", selected = row$reference_id)
+    split_bind <- function(x) { x <- x %||% ""; if (!nzchar(x)) character() else unlist(strsplit(x, "\\s*[;,|]\\s*")) }
+    updateSelectInput(session, "aoi_participant_bind", selected = split_bind(row$participant))
+    updateSelectInput(session, "aoi_condition_bind", selected = split_bind(row$condition))
+    updateSelectInput(session, "aoi_trial_bind", selected = split_bind(row$trial_id))
+    updateSelectInput(session, "aoi_phase_bind", selected = split_bind(row$phase))
+    if ("time_start_event" %in% names(row)) updateSelectInput(session, "aoi_time_start_event", selected = row$time_start_event)
+    if ("time_end_event" %in% names(row)) updateSelectInput(session, "aoi_time_end_event", selected = row$time_end_event)
+    updateNumericInput(session, "circle_radius", value = ifelse(is.na(row$radius), input$circle_radius, row$radius))
+    updateNumericInput(session, "aoi_time_start", value = row$time_start)
+    updateNumericInput(session, "aoi_time_end", value = row$time_end)
+    updateNumericInput(session, "aoi_priority", value = row$priority)
+    updateCheckboxInput(session, "aoi_enabled", value = isTRUE(row$enabled))
+  }
+
+  aoi_binding_summary <- reactive({
+    dt <- normalize_aoi(aoi_dt())
+    if (nrow(dt) == 0) return(data.table())
+    dt[, row_id := seq_len(.N)]
+    idx <- selected_aoi_index()
+    selected_label <- "全部 AOI"
+    if (is.finite(idx)) {
+      row <- dt[idx]
+      selected_label <- paste(row$aoi_group_id, row$shape_id, sep = " / ")
+      dt <- dt[
+        aoi_group_id == row$aoi_group_id &
+          shape_id == row$shape_id &
+          reference_id == row$reference_id
+      ]
+    }
+    out <- copy(dt)
+    out[, binding_scope := fifelse(!nzchar(participant) & !nzchar(trial_id), "全局/模板",
+      fifelse(grepl("[;,|]", participant) | grepl("[;,|]", trial_id), "批量规则", "单被试-trial")
+    )]
+    out[, selected_aoi := selected_label]
+    out[, time_window := fifelse(
+      nzchar(time_start_event) | nzchar(time_end_event),
+      paste0(ifelse(nzchar(time_start_event), time_start_event, "manual"), " -> ", ifelse(nzchar(time_end_event), time_end_event, "manual")),
+      paste0(ifelse(is.na(time_start), "All", as.character(time_start)), " -> ", ifelse(is.na(time_end), "All", as.character(time_end)))
+    )]
+    cols <- c("row_id", "selected_aoi", "binding_scope", "enabled", "aoi_group_id", "aoi_name", "shape_id", "reference_id", "participant", "trial_id", "condition", "phase", "time_window")
+    out <- out[, ..cols]
+    setorder(out, -enabled, binding_scope, participant, condition, trial_id, phase)
+    out
+  })
+
+  selected_binding_row_id <- reactive({
+    idx <- input$aoi_binding_summary_tbl_rows_selected
+    x <- aoi_binding_summary()
+    if (length(idx) != 1 || nrow(x) < idx) return(NA_integer_)
+    x$row_id[idx]
+  })
+
+  observeEvent(input$aoi_tbl_rows_selected, {
+    idx <- input$aoi_tbl_rows_selected
+    if (length(idx) == 1) editing_aoi_row(idx)
+    idx <- selected_aoi_index()
+    if (!is.finite(idx)) return()
+    row <- aoi_dt()[idx]
+    load_aoi_row_to_inputs(row)
+  })
+
+  observeEvent(input$load_aoi_binding, {
+    row_id <- selected_binding_row_id()
+    if (!is.finite(row_id)) {
+      showNotification("请先在绑定情况表中选中一条绑定记录。", type = "warning")
+      return()
+    }
+    dt <- aoi_dt()
+    if (nrow(dt) < row_id) return()
+    editing_aoi_row(row_id)
+    load_aoi_row_to_inputs(dt[row_id])
+    showNotification(sprintf("已载入第 %s 条 AOI 绑定，可修改后点击“更新选中 AOI”。", row_id), type = "message")
+  })
+
   new_aoi_row <- function(shape_type, coords) {
     old <- aoi_dt()
-    id <- paste0(input$aoi_group %||% "aoi", "_", nrow(old) + 1)
+    custom_id <- trimws(input$aoi_shape_id %||% "")
+    id <- if (nzchar(custom_id)) custom_id else paste0(input$aoi_group %||% "aoi", "_", nrow(old) + 1)
     data.table(
       aoi_group_id = input$aoi_group %||% "aoi_1",
       aoi_name = input$aoi_name %||% input$aoi_group %||% "AOI",
       shape_id = id,
+      reference_id = current_reference_id(),
       shape_type = shape_type,
       x_min = coords$x_min, y_min = coords$y_min, x_max = coords$x_max, y_max = coords$y_max,
       center_x = coords$center_x, center_y = coords$center_y, radius = coords$radius,
-      participant = "", trial_id = selected_trial(), condition = "", phase = selected_phase(),
-      time_start = input$aoi_time_start, time_end = input$aoi_time_end, priority = input$aoi_priority %||% 0, enabled = isTRUE(input$aoi_enabled)
+      participant = selected_aoi_participant(), trial_id = selected_aoi_trial(), condition = selected_aoi_condition(), phase = selected_aoi_phase(),
+      time_start = input$aoi_time_start, time_end = input$aoi_time_end,
+      time_start_event = input$aoi_time_start_event %||% "", time_end_event = input$aoi_time_end_event %||% "",
+      priority = input$aoi_priority %||% 0, enabled = isTRUE(input$aoi_enabled)
     )
   }
 
@@ -496,11 +807,134 @@ server <- function(input, output, session) {
     aoi_dt(normalize_aoi(rbindlist(list(aoi_dt(), row), fill = TRUE)))
   })
 
+  observeEvent(input$update_aoi, {
+    idx <- selected_aoi_index()
+    if (!is.finite(idx)) return()
+    dt <- copy(aoi_dt())
+    dt[idx, `:=`(
+      aoi_group_id = input$aoi_group %||% aoi_group_id,
+      aoi_name = input$aoi_name %||% aoi_name,
+      shape_id = ifelse(nzchar(trimws(input$aoi_shape_id %||% "")), trimws(input$aoi_shape_id), shape_id),
+      reference_id = current_reference_id(),
+      participant = selected_aoi_participant(),
+      trial_id = selected_aoi_trial(),
+      condition = selected_aoi_condition(),
+      phase = selected_aoi_phase(),
+      time_start = input$aoi_time_start,
+      time_end = input$aoi_time_end,
+      time_start_event = input$aoi_time_start_event %||% "",
+      time_end_event = input$aoi_time_end_event %||% "",
+      priority = input$aoi_priority %||% priority,
+      enabled = isTRUE(input$aoi_enabled)
+    )]
+    if (dt$shape_type[idx] == "circle") dt[idx, radius := input$circle_radius]
+    aoi_dt(normalize_aoi(dt))
+  })
+
+  observeEvent(input$duplicate_aoi_time, {
+    idx <- selected_aoi_index()
+    if (!is.finite(idx)) return()
+    dt <- copy(aoi_dt())
+    row <- copy(dt[idx])
+    row[, `:=`(
+      aoi_group_id = input$aoi_group %||% aoi_group_id,
+      aoi_name = input$aoi_name %||% aoi_name,
+      shape_id = ifelse(nzchar(trimws(input$aoi_shape_id %||% "")), trimws(input$aoi_shape_id), shape_id),
+      reference_id = current_reference_id(),
+      participant = selected_aoi_participant(),
+      trial_id = selected_aoi_trial(),
+      condition = selected_aoi_condition(),
+      phase = selected_aoi_phase(),
+      time_start = input$aoi_time_start,
+      time_end = input$aoi_time_end,
+      time_start_event = input$aoi_time_start_event %||% "",
+      time_end_event = input$aoi_time_end_event %||% "",
+      priority = input$aoi_priority %||% priority,
+      enabled = isTRUE(input$aoi_enabled)
+    )]
+    aoi_dt(normalize_aoi(rbindlist(list(dt, row), fill = TRUE)))
+  })
+
+  observeEvent(input$bind_current_trial_aoi, {
+    idx <- selected_aoi_index()
+    tr <- selected_trial()
+    if (!is.finite(idx)) {
+      showNotification("请先在 AOI 表中选中一条已有 AOI。", type = "warning")
+      return()
+    }
+    if (!nzchar(tr)) {
+      showNotification("请先在左侧 Trial 下拉框中选择一个具体 Trial，不能使用 All。", type = "warning")
+      return()
+    }
+    dt <- copy(aoi_dt())
+    row <- copy(dt[idx])
+    source_is_template <- !nzchar(dt$participant[idx] %||% "") && !nzchar(dt$trial_id[idx] %||% "")
+    row[, `:=`(
+      participant = active_participant(),
+      trial_id = tr,
+      condition = selected_trial_condition(),
+      phase = selected_aoi_phase(),
+      time_start = input$aoi_time_start,
+      time_end = input$aoi_time_end,
+      time_start_event = input$aoi_time_start_event %||% "",
+      time_end_event = input$aoi_time_end_event %||% "",
+      priority = input$aoi_priority %||% priority,
+      enabled = TRUE
+    )]
+    keys <- c("aoi_group_id", "shape_id", "participant", "trial_id", "condition", "phase", "time_start_event", "time_end_event")
+    keys <- intersect(keys, names(dt))
+    if (length(keys) > 0 && nrow(dt) > 0) {
+      dt[, .row_key := do.call(paste, c(.SD, sep = "\r")), .SDcols = keys]
+      row[, .row_key := do.call(paste, c(.SD, sep = "\r")), .SDcols = keys]
+      if (row$.row_key[1] %in% dt$.row_key) {
+        row_key <- row$.row_key[1]
+        row[, .row_key := NULL]
+        update_cols <- intersect(names(row), names(dt))
+        dt[.row_key == row_key, (update_cols) := row[, ..update_cols]]
+        if (source_is_template) dt[idx, enabled := FALSE]
+        dt[, .row_key := NULL]
+        aoi_dt(normalize_aoi(dt))
+        showNotification(sprintf("已更新 %s / %s 的 AOI 绑定。", active_participant(), tr), type = "message")
+        return()
+      }
+      dt[, .row_key := NULL]
+      row[, .row_key := NULL]
+    }
+    if (source_is_template) dt[idx, enabled := FALSE]
+    aoi_dt(normalize_aoi(rbindlist(list(dt, row), fill = TRUE)))
+    showNotification(sprintf("已新增 %s / %s 的 AOI 绑定。", active_participant(), tr), type = "message")
+  })
+
+  observeEvent(input$delete_aoi, {
+    idx <- selected_aoi_index()
+    if (!is.finite(idx)) return()
+    dt <- copy(aoi_dt())
+    aoi_dt(if (nrow(dt) == 1) empty_aoi() else normalize_aoi(dt[-idx]))
+    editing_aoi_row(NA_integer_)
+  })
+
+  observeEvent(input$delete_aoi_binding, {
+    row_id <- selected_binding_row_id()
+    if (!is.finite(row_id)) {
+      showNotification("请先在绑定情况表中选中一条绑定记录。", type = "warning")
+      return()
+    }
+    dt <- copy(aoi_dt())
+    if (nrow(dt) < row_id) return()
+    deleted <- dt[row_id]
+    aoi_dt(if (nrow(dt) == 1) empty_aoi() else normalize_aoi(dt[-row_id]))
+    editing_aoi_row(NA_integer_)
+    showNotification(sprintf("已删除 %s / %s / %s 的 AOI 绑定。", deleted$participant %||% "All", deleted$trial_id %||% "All", deleted$aoi_group_id), type = "message")
+  })
+
   observeEvent(input$clear_aoi, aoi_dt(empty_aoi()))
 
-  output$aoi_canvas <- renderPlot({ req(active_parsed()); plot_aoi_canvas(active_parsed(), aoi_dt(), reference_img()) })
-  output$aoi_overlay_plot <- renderPlot({ req(active_parsed()); plot_aoi_canvas(active_parsed(), aoi_dt(), reference_img()) })
-  output$aoi_tbl <- renderDT(datatable(aoi_dt(), filter = "top", rownames = FALSE, options = list(scrollX = TRUE)))
+  output$aoi_canvas <- renderPlot({ req(active_parsed()); plot_aoi_canvas(active_parsed(), aoi_dt(), current_reference_img(), current_reference_id()) })
+  output$aoi_overlay_plot <- renderPlot({ req(active_parsed()); plot_aoi_canvas(active_parsed(), aoi_dt(), current_reference_img(), current_reference_id()) })
+  output$aoi_tbl <- renderDT(datatable(aoi_dt(), filter = "top", selection = "single", rownames = FALSE, options = list(scrollX = TRUE)))
+  output$aoi_binding_summary_tbl <- renderDT({
+    datatable(aoi_binding_summary(), filter = "top", selection = "single", rownames = FALSE, options = list(scrollX = TRUE, pageLength = 8))
+  })
   output$aoi_report_tbl <- render_report("aoi_report")
   output$behavior_check_tbl <- render_report("behavior_check_report")
   output$merged_behavior_tbl <- render_report("merged_eye_behavior_report", 1000)
@@ -572,9 +1006,40 @@ server <- function(input, output, session) {
     content = function(file) export_xlsx(current_reports(), file)
   )
 
+  output$download_all_xlsx <- downloadHandler(
+    filename = function() paste0("eyelink_reports_all_subjects_", Sys.Date(), ".zip"),
+    content = function(file) {
+      req(length(parsed_items()) > 0)
+      out_dir <- tempfile("eyelink_reports_all_")
+      dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+      files <- character()
+      nms <- names(parsed_items())
+      for (nm in nms) {
+        safe_name <- gsub("[^A-Za-z0-9_.-]+", "_", tools::file_path_sans_ext(nm))
+        xlsx <- file.path(out_dir, paste0(safe_name, "_reports.xlsx"))
+        export_xlsx(reports_for_item(parsed_items()[[nm]], report_items()[[nm]]), xlsx)
+        files <- c(files, xlsx)
+      }
+      old <- setwd(out_dir)
+      on.exit(setwd(old), add = TRUE)
+      utils::zip(zipfile = file, files = basename(files), flags = "-r9Xj")
+    }
+  )
+
   output$download_project <- downloadHandler(
     filename = function() paste0("eyelink_project_", Sys.Date(), ".rds"),
-    content = function(file) saveRDS(list(aoi = aoi_dt(), behavior = behavior_dt(), bin_ms = input$bin_ms, baseline_ms = input$baseline_ms, aoi_method = input$aoi_method), file)
+    content = function(file) saveRDS(list(
+      parsed_items = parsed_items(),
+      report_items = report_items(),
+      parsed_file_info = parsed_file_info(),
+      aoi = aoi_dt(),
+      behavior = behavior_dt(),
+      behavior_items = behavior_items(),
+      reference_imgs = reference_imgs(),
+      bin_ms = input$bin_ms,
+      baseline_ms = input$baseline_ms,
+      aoi_method = input$aoi_method
+    ), file)
   )
 
   output$download_png <- downloadHandler(
@@ -583,10 +1048,10 @@ server <- function(input, output, session) {
       p <- switch(
         input$png_plot,
         timeline = safe_timeline(analysis_view()$parsed, ""),
-        scanpath = safe_scanpath(analysis_view()$parsed, "", "", reference_img()),
-        heatmap = safe_heatmap(analysis_view()$parsed, "", "", reference_img()),
+        scanpath = safe_scanpath(analysis_view()$parsed, "", "", current_reference_img()),
+        heatmap = safe_heatmap(analysis_view()$parsed, "", "", current_reference_img()),
         pupil = safe_pupil_curve(analysis_view()$reports, "", ""),
-        aoi = plot_aoi_canvas(active_parsed(), aoi_dt(), reference_img())
+        aoi = plot_aoi_canvas(active_parsed(), aoi_dt(), current_reference_img(), current_reference_id())
       )
       ggplot2::ggsave(file, p, width = 10, height = 6, dpi = 160, device = ragg::agg_png)
     }
