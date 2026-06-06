@@ -3,7 +3,7 @@
 
 options(shiny.maxRequestSize = 1024 * 1024^2)
 
-required_packages <- c("shiny", "DT", "data.table", "ggplot2", "openxlsx", "ggforce", "png", "jpeg", "plotly", "readxl")
+required_packages <- c("shiny", "DT", "data.table", "ggplot2", "openxlsx", "ggforce", "png", "jpeg", "plotly", "readxl", "jsonlite")
 missing_packages <- required_packages[!vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)]
 if (length(missing_packages) > 0) {
   stop("Missing R packages: ", paste(missing_packages, collapse = ", "), ". Run source('install_dependencies.R') first.", call. = FALSE)
@@ -17,6 +17,7 @@ library(plotly)
 
 source("global.R", encoding = "UTF-8")
 source("R/core.R", encoding = "UTF-8")
+source("R/dynamic_aoi_video.R", encoding = "UTF-8")
 
 empty_aoi <- function() data.table(
   aoi_group_id = character(), aoi_name = character(), shape_id = character(), reference_id = character(), shape_type = character(),
@@ -217,6 +218,7 @@ workflow_table <- function() {
 
 ui <- fluidPage(
   includeCSS("www/app.css"),
+  tags$head(tags$script(src = "dynamic-aoi-player.js?v=20260606-spatial-calibration")),
   titlePanel("EyeLink ASC 眼动分析工具"),
   sidebarLayout(
     sidebarPanel(
@@ -291,6 +293,7 @@ ui <- fluidPage(
           DTOutput("aoi_binding_summary_tbl")
         ),
         tabPanel("AOI 分析", br(), plotOutput("aoi_overlay_plot", height = 460), h4("AOI Report"), DTOutput("aoi_report_tbl")),
+        tabPanel("动态 AOI 验证", br(), dynamic_aoi_validator_module_ui("dynamic_validator")),
         tabPanel("答题合并", br(), h4("时间戳 / 题目匹配检查"), DTOutput("behavior_check_tbl"), h4("眼动 + 行为综合表"), DTOutput("merged_behavior_tbl"), h4("Condition Summary"), DTOutput("condition_summary_tbl")),
         tabPanel("原始报表", br(), h4("Fixation"), DTOutput("fix_tbl"), h4("Saccade"), DTOutput("sac_tbl"), h4("Blink"), DTOutput("blink_tbl"), h4("Messages / Events"), DTOutput("event_tbl")),
         tabPanel("DataViewer 对齐检查", br(),
@@ -326,6 +329,7 @@ server <- function(input, output, session) {
   reference_imgs <- reactiveVal(list())
   dv_alignment <- reactiveVal(list())
   dv_alignment_file <- reactiveVal(NULL)
+  dynamic_aoi_validator_module_server("dynamic_validator")
 
   observeEvent(input$reference_file, {
     req(input$reference_file)

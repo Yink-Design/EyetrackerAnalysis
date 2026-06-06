@@ -57,8 +57,10 @@ data/demo/FM164641_expected_counts.csv
 | 答题 CSV 合并与时间戳检查 | 已写入基础逻辑 |
 | XLSX 导出 | 已写入基础逻辑 |
 | 热图 / 轨迹 / 时间线基础图 | 已写入 |
+| 动态 AOI 视频验证 | 已集成到主菜单，支持实时 AOI / gaze 叠加 |
+| 动态 AOI 时间与空间校准 | 支持时间偏移、X/Y 位移和横纵缩放 |
 
-重要：当前代码是在无 R 运行时环境下生成的，尚未完成本地实际运行测试。CodeX / Codex 的第一项任务应是进行本地 R 运行验证和修复。
+当前版本已在 Windows + R 4.5.3 环境完成本地运行与回归测试。
 
 ## 安装依赖
 
@@ -150,6 +152,19 @@ testthat::test_dir("tests/testthat")
 shiny::runApp()
 ```
 
+## 动态 AOI 视频验证
+
+主菜单中的 **动态 AOI 验证** 页面支持上传录屏视频、UE 动态 AOI CSV，以及可选的 EyeLink ASC / gaze CSV。视频播放时会实时叠加 AOI 框和眼动点。
+
+可用校准项：
+
+- `AOI 视频时间偏移 / ms`：AOI 比画面慢时填写负值，比画面快时填写正值。
+- `AOI 整体水平偏移 / px` 与 `AOI 整体垂直偏移 / px`：修正录屏窗口边框、标题栏等造成的坐标原点差异。
+- `AOI 横向缩放 / %` 与 `AOI 纵向缩放 / %`：以画面中心为基准修正坐标比例。
+- `叠加眼动窗口 ±ms`：仅控制当前视频时间附近显示的眼动点范围，不会移动 AOI。
+
+UE 动态 AOI 坐标通常以游戏 Viewport 左上角为原点。正式录制建议使用 Standalone 全屏，并保持 UE Viewport、录屏和 EyeLink `DISPLAY_COORDS` 分辨率一致。
+
 ## 输入文件
 
 ### 1. EyeLink ASC
@@ -212,8 +227,6 @@ participant,trial_id,condition,question_id,question_start_unix,question_submit_u
 
 | 功能 | 状态 |
 |---|---|
-| 视频导入 | 暂不做，后续 V5 |
-| 视频叠加 gaze replay | 暂不做 |
 | 多边形 AOI | 暂不做，用多个矩形 / 圆形组合代替 |
 | 直接读取 EDF | 暂不做，当前优先 ASC |
 | 内置 ANOVA / LMM / SEM | 暂不做，优先导出统计前长表 |
@@ -222,6 +235,10 @@ participant,trial_id,condition,question_id,question_start_unix,question_submit_u
 
 1. 当前第一目标是指标导出与论文分析表生成，不是完整复制 DataViewer 的回放体验。
 2. 多边形 AOI 暂不做，异形区域建议由多个矩形 / 圆形组合。
-3. 动态 3D AOI 建议后续由 UE 导出屏幕空间 bounding box 后再接入。
+3. 动态 3D AOI 由 UE 导出屏幕空间 bounding box 后，可在动态 AOI 验证页面与录屏进行校准和检查。
 4. 瞳孔字段按 EyeLink `PUPIL AREA` 处理，论文中建议写为 pupil size / pupil area，并进行 baseline correction。
 5. 2000 Hz ASC 可能出现同一毫秒两行 sample，程序保留 `sample_index`，不要按时间戳去重。
+
+## 推送日志
+
+详细变更记录见 [`PUSH_LOG.md`](PUSH_LOG.md)。

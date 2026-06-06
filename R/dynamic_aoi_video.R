@@ -74,9 +74,9 @@ standardize_dynamic_aoi <- function(x, time_unit = c("ms", "sec"), source_file =
   .daoi_need_pkg("data.table")
   time_unit <- match.arg(time_unit)
   if (is.null(x) || nrow(x) == 0) return(.daoi_empty())
-  dt <- data.table::as.data.table(x)
+  dt <- data.table::copy(data.table::as.data.table(x))
   original_names <- names(dt)
-  names(dt) <- .daoi_norm_names(names(dt))
+  data.table::setnames(dt, .daoi_norm_names(names(dt)))
 
   n <- nrow(dt)
   get_chr <- function(cands, default = "") {
@@ -145,11 +145,9 @@ standardize_dynamic_aoi <- function(x, time_unit = c("ms", "sec"), source_file =
   for (nm in c("participant", "trial_id", "condition", "phase", "aoi_group_id", "aoi_name", "shape_id", "source_file")) {
     out[[nm]][is.na(out[[nm]])] <- ""
   }
-  out[, `:=`(
-    width = abs(x_max - x_min),
-    height = abs(y_max - y_min),
-    area = abs(x_max - x_min) * abs(y_max - y_min)
-  )]
+  data.table::set(out, j = "width", value = abs(out$x_max - out$x_min))
+  data.table::set(out, j = "height", value = abs(out$y_max - out$y_min))
+  data.table::set(out, j = "area", value = abs(out$x_max - out$x_min) * abs(out$y_max - out$y_min))
   out[, invalid_reason := ""]
   out[enabled != TRUE, invalid_reason := paste0(invalid_reason, ";disabled")]
   out[visible != TRUE, invalid_reason := paste0(invalid_reason, ";hidden")]
@@ -308,7 +306,7 @@ plot_dynamic_aoi_frame <- function(frame_file, aoi_rows = NULL, gaze_rows = NULL
 
   if (!is.null(aoi_rows) && nrow(aoi_rows) > 0) {
     ar <- scale_screen_dt(aoi_rows, frame_width, frame_height, screen_width, screen_height)
-    ar[, label := ifelse(nzchar(aoi_name), aoi_name, aoi_group_id)]
+    data.table::set(ar, j = "label", value = ifelse(nzchar(ar$aoi_name), ar$aoi_name, ar$aoi_group_id))
     p <- p +
       ggplot2::geom_rect(data = ar, ggplot2::aes(xmin = x_min, xmax = x_max, ymin = y_min, ymax = y_max, color = valid_aoi),
         fill = NA, linewidth = 1.0, inherit.aes = FALSE) +
@@ -330,6 +328,188 @@ plot_dynamic_aoi_frame <- function(frame_file, aoi_rows = NULL, gaze_rows = NULL
   p
 }
 
+.daoi_default_ffmpeg <- function() {
+  local_ffmpeg <- "D:/Tools/ffmpeg/bin/ffmpeg.exe"
+  if (file.exists(local_ffmpeg)) local_ffmpeg else "ffmpeg"
+}
+
+.daoi_apply_aoi_offset <- function(aoi, offset_ms = 0) {
+  out <- data.table::copy(data.table::as.data.table(aoi))
+  offset_ms <- suppressWarnings(as.numeric(offset_ms %||% 0))
+  if (!is.finite(offset_ms)) offset_ms <- 0
+  for (nm in intersect(c("time_ms", "start_ms", "end_ms"), names(out))) {
+    data.table::set(out, j = nm, value = as.numeric(out[[nm]]) + offset_ms)
+  }
+  data.table::set(out, j = "aoi_video_offset_ms", value = offset_ms)
+  out
+}
+
+dynamic_aoi_validator_module_ui <- function(id) {
+  ns <- shiny::NS(id)
+  shiny::fluidRow(
+    shiny::column(4,
+      shiny::fileInput(ns("video_file"), "上传录屏视频（MP4/MOV/AVI/MKV）", accept = c(".mp4", ".mov", ".avi", ".mkv")),
+      shiny::fileInput(ns("aoi_file"), "上传 UE 动态 AOI CSV", accept = c(".csv", ".txt")),
+      shiny::fileInput(ns("gaze_file"), "可选：上传眼动 ASC 或 gaze CSV", accept = c(".asc", ".csv", ".txt")),
+      shiny::selectInput(ns("aoi_time_unit"), "AOI 时间单位", choices = c("毫秒 ms" = "ms", "秒 sec" = "sec"), selected = "ms"),
+      shiny::selectInput(ns("gaze_time_unit"), "眼动 CSV 时间单位", choices = c("毫秒 ms" = "ms", "秒 sec" = "sec"), selected = "ms"),
+      shiny::numericInput(ns("gaze_offset_ms"), "眼动时间偏移 / ms", value = 0, step = 10),
+      shiny::numericInput(ns("aoi_video_offset_ms"), "AOI 视频时间偏移 / ms", value = 0, step = 50),
+      shiny::helpText("AOI 框比画面慢时填写负值；框比画面快时填写正值。"),
+      shiny::numericInput(ns("aoi_offset_x"), "AOI 整体水平偏移 / px", value = 0, step = 5),
+      shiny::numericInput(ns("aoi_offset_y"), "AOI 整体垂直偏移 / px", value = 0, step = 5),
+      shiny::numericInput(ns("aoi_scale_x"), "AOI 横向缩放 / %", value = 100, min = 1, step = 1),
+      shiny::numericInput(ns("aoi_scale_y"), "AOI 纵向缩放 / %", value = 100, min = 1, step = 1),
+      shiny::helpText("偏移以原始录屏像素计算；缩放以画面中心为基准。"),
+      shiny::numericInput(ns("screen_width"), "录屏坐标宽度", value = 1920, min = 1),
+      shiny::numericInput(ns("screen_height"), "录屏坐标高度", value = 1080, min = 1),
+      shiny::numericInput(ns("nearest_aoi_ms"), "AOI 最近帧容差 / ms", value = 120, min = 1, step = 10),
+      shiny::numericInput(ns("gaze_window_ms"), "叠加眼动窗口 ±ms", value = 120, min = 1, step = 10),
+      shiny::checkboxInput(ns("valid_only"), "只显示有效 AOI", value = TRUE),
+      shiny::actionButton(ns("run_check"), "读取并开始动态验证", class = "btn-primary"),
+      shiny::verbatimTextOutput(ns("status"))
+    ),
+    shiny::column(8,
+      shiny::uiOutput(ns("dynamic_video_player")),
+      shiny::h4("AOI 有效性"),
+      DT::DTOutput(ns("quality_tbl")),
+      shiny::h4("无效 / 风险 AOI"),
+      DT::DTOutput(ns("invalid_tbl"))
+    )
+  )
+}
+
+dynamic_aoi_validator_module_server <- function(id) {
+  shiny::moduleServer(id, function(input, output, session) {
+    ns <- session$ns
+    aoi_raw_rv <- shiny::reactiveVal(data.table::data.table())
+    aoi_rv <- shiny::reactiveVal(data.table::data.table())
+    gaze_rv <- shiny::reactiveVal(data.table::data.table())
+    quality_rv <- shiny::reactiveVal(list(summary = data.table::data.table(), invalid_rows = data.table::data.table(), gaps = data.table::data.table()))
+    video_url_rv <- shiny::reactiveVal(NULL)
+    video_dir <- file.path(tempdir(), paste0("dynamic_aoi_video_", as.integer(stats::runif(1, 1, 1e9))))
+    dir.create(video_dir, recursive = TRUE, showWarnings = FALSE)
+    video_prefix <- paste0("dynamic-aoi-video-", as.integer(stats::runif(1, 1, 1e9)))
+    shiny::addResourcePath(video_prefix, video_dir)
+
+    rebuild_aoi <- function() {
+      raw <- aoi_raw_rv()
+      if (nrow(raw) == 0) return(invisible(NULL))
+      adjusted <- .daoi_apply_aoi_offset(raw, input$aoi_video_offset_ms)
+      aoi_rv(adjusted)
+      quality_rv(validate_dynamic_aoi(adjusted, screen_width = input$screen_width, screen_height = input$screen_height))
+      invisible(adjusted)
+    }
+
+    write_player_rows <- function(dt, file_name, columns) {
+      out <- data.table::copy(data.table::as.data.table(dt))
+      keep <- intersect(columns, names(out))
+      out <- out[, ..keep]
+      target <- file.path(video_dir, file_name)
+      con <- file(target, open = "wb")
+      on.exit(close(con), add = TRUE)
+      jsonlite::stream_out(as.data.frame(out), con, verbose = FALSE)
+      paste0("/", video_prefix, "/", file_name)
+    }
+
+    send_player_data <- function() {
+      shiny::isolate({
+        gaze <- data.table::copy(gaze_rv())
+        if (nrow(gaze) > 100000) gaze <- gaze[unique(round(seq(1, .N, length.out = 100000)))]
+        aoi_url <- write_player_rows(
+          aoi_rv(),
+          "dynamic-aoi.ndjson",
+          c("aoi_group_id", "aoi_name", "shape_id", "time_ms", "start_ms", "end_ms", "x_min", "y_min", "x_max", "y_max", "valid_aoi")
+        )
+        gaze_url <- write_player_rows(
+          gaze,
+          "dynamic-gaze.ndjson",
+          c("video_time_ms", "gaze_x", "gaze_y")
+        )
+        session$sendCustomMessage("dynamic-aoi-player-data", list(
+          id = ns("player"),
+          videoId = ns("video"),
+          canvasId = ns("canvas"),
+          statusId = ns("time"),
+          aoiUrl = aoi_url,
+          gazeUrl = gaze_url,
+          screenWidth = input$screen_width %||% 1920,
+          screenHeight = input$screen_height %||% 1080,
+          aoiOffsetX = input$aoi_offset_x %||% 0,
+          aoiOffsetY = input$aoi_offset_y %||% 0,
+          aoiScaleX = input$aoi_scale_x %||% 100,
+          aoiScaleY = input$aoi_scale_y %||% 100,
+          nearestMs = input$nearest_aoi_ms %||% 120,
+          gazeWindowMs = input$gaze_window_ms %||% 120,
+          validOnly = isTRUE(input$valid_only)
+        ))
+      })
+    }
+
+    output$dynamic_video_player <- shiny::renderUI({
+      video_url <- video_url_rv()
+      if (is.null(video_url)) return(shiny::helpText("上传录屏视频与动态 AOI CSV 后，视频会在这里连续播放并实时绘制 AOI。"))
+      shiny::tagList(
+        shiny::tags$div(style = "position:relative; width:100%; background:#111; line-height:0;",
+          shiny::tags$video(id = ns("video"), src = video_url, controls = NA, preload = "metadata", style = "display:block; width:100%; height:auto; max-height:72vh;"),
+          shiny::tags$canvas(id = ns("canvas"), style = "position:absolute; inset:0; width:100%; height:100%; pointer-events:none;")
+        ),
+        shiny::tags$p(shiny::tags$b("当前视频时间："), shiny::tags$span(id = ns("time"), "0 ms"))
+      )
+    })
+
+    shiny::observeEvent(input$run_check, {
+      shiny::req(input$aoi_file, input$video_file)
+      aoi <- read_dynamic_aoi_csv(input$aoi_file$datapath, time_unit = input$aoi_time_unit, source_file = input$aoi_file$name)
+      aoi_raw_rv(aoi)
+      rebuild_aoi()
+      if (!is.null(input$gaze_file)) {
+        gaze <- read_gaze_table(input$gaze_file$datapath, time_unit = input$gaze_time_unit, source_file = input$gaze_file$name)
+        if (nrow(gaze) > 0) gaze[, video_time_ms := time_ms - input$gaze_offset_ms]
+        gaze_rv(gaze)
+      } else {
+        gaze_rv(data.table::data.table())
+      }
+      ext <- tools::file_ext(input$video_file$name)
+      target <- file.path(video_dir, paste0("video", if (nzchar(ext)) paste0(".", ext) else ""))
+      file.copy(input$video_file$datapath, target, overwrite = TRUE)
+      video_url_rv(paste0("/", video_prefix, "/", utils::URLencode(basename(target), reserved = TRUE)))
+      later::later(send_player_data, delay = 0.3)
+      shiny::showNotification("动态 AOI 视频验证已加载。", type = "message")
+    })
+
+    shiny::observeEvent(input$aoi_video_offset_ms, {
+      if (nrow(aoi_raw_rv()) > 0) {
+        rebuild_aoi()
+        send_player_data()
+      }
+    }, ignoreInit = TRUE)
+
+    shiny::observeEvent(list(
+      input$screen_width, input$screen_height,
+      input$aoi_offset_x, input$aoi_offset_y, input$aoi_scale_x, input$aoi_scale_y,
+      input$nearest_aoi_ms, input$gaze_window_ms, input$valid_only
+    ), {
+      if (nrow(aoi_raw_rv()) > 0) rebuild_aoi()
+      if (nrow(aoi_rv()) > 0) send_player_data()
+    }, ignoreInit = TRUE)
+
+    output$status <- shiny::renderPrint({
+      cat("AOI rows:", nrow(aoi_rv()), "\n")
+      cat("AOI video offset ms:", input$aoi_video_offset_ms %||% 0, "\n")
+      cat("AOI spatial adjustment:", sprintf("x=%s px, y=%s px, scale=%s%% x %s%%", input$aoi_offset_x %||% 0, input$aoi_offset_y %||% 0, input$aoi_scale_x %||% 100, input$aoi_scale_y %||% 100), "\n")
+      cat("Gaze rows:", nrow(gaze_rv()), "\n")
+      cat("Video loaded:", !is.null(video_url_rv()), "\n")
+    })
+    output$quality_tbl <- DT::renderDT(DT::datatable(quality_rv()$summary, filter = "top", rownames = FALSE, options = list(scrollX = TRUE, pageLength = 6)))
+    output$invalid_tbl <- DT::renderDT({
+      invalid <- quality_rv()$invalid_rows
+      if (nrow(invalid) > 5000) invalid <- head(invalid, 5000)
+      DT::datatable(invalid, filter = "top", rownames = FALSE, options = list(scrollX = TRUE, pageLength = 6))
+    })
+  })
+}
+
 # Lightweight standalone Shiny app.
 dynamic_aoi_validator_app <- function() {
   .daoi_need_pkg("shiny")
@@ -338,6 +518,7 @@ dynamic_aoi_validator_app <- function() {
   .daoi_need_pkg("ggplot2")
 
   ui <- shiny::fluidPage(
+    shiny::tags$head(shiny::tags$script(src = "dynamic-aoi-player.js?v=20260606-spatial-calibration")),
     shiny::titlePanel("动态 AOI 录屏验证 / Dynamic AOI Video Validator"),
     shiny::sidebarLayout(
       shiny::sidebarPanel(
@@ -353,7 +534,7 @@ dynamic_aoi_validator_app <- function() {
         shiny::numericInput("max_frames", "最多抽帧数", value = 20, min = 1, max = 200),
         shiny::numericInput("gaze_window_ms", "叠加眼动窗口 ±ms", value = 120, min = 1, step = 10),
         shiny::numericInput("nearest_aoi_ms", "无时间窗时 AOI 最近帧容差 / ms", value = 120, min = 1, step = 10),
-        shiny::textInput("ffmpeg_path", "ffmpeg 路径", value = "ffmpeg"),
+        shiny::textInput("ffmpeg_path", "ffmpeg 路径", value = .daoi_default_ffmpeg()),
         shiny::checkboxInput("valid_only", "预览时只显示有效 AOI（projection_valid=1 且未 clamped）", value = TRUE),
         shiny::actionButton("run_check", "读取并抽帧验证", class = "btn-primary"),
         shiny::hr(),
@@ -364,6 +545,7 @@ dynamic_aoi_validator_app <- function() {
         shiny::tabsetPanel(
           shiny::tabPanel("状态", shiny::br(), shiny::verbatimTextOutput("status")),
           shiny::tabPanel("AOI 有效性", shiny::br(), DT::DTOutput("quality_tbl"), shiny::h4("无效 / 风险 AOI 行"), DT::DTOutput("invalid_tbl"), shiny::h4("有效 AOI 时间断点"), DT::DTOutput("gap_tbl")),
+          shiny::tabPanel("动态视频预览", shiny::br(), shiny::uiOutput("dynamic_video_player")),
           shiny::tabPanel("录屏叠加预览", shiny::br(), shiny::selectInput("frame_select", "预览帧", choices = character()), shiny::plotOutput("overlay_plot", height = 650)),
           shiny::tabPanel("标准化 AOI", shiny::br(), DT::DTOutput("aoi_tbl")),
           shiny::tabPanel("眼动数据", shiny::br(), shiny::helpText("未上传眼动文件也可以完成 AOI 验证。上传后会在预览图中叠加 gaze 轨迹。"), DT::DTOutput("gaze_tbl"))
@@ -378,6 +560,68 @@ dynamic_aoi_validator_app <- function() {
     gaze_rv <- shiny::reactiveVal(data.table::data.table())
     frames_rv <- shiny::reactiveVal(data.table::data.table())
     last_plot_rv <- shiny::reactiveVal(NULL)
+    video_url_rv <- shiny::reactiveVal(NULL)
+    video_dir <- file.path(tempdir(), paste0("dynamic_aoi_video_", as.integer(stats::runif(1, 1, 1e9))))
+    dir.create(video_dir, recursive = TRUE, showWarnings = FALSE)
+    video_prefix <- paste0("dynamic-aoi-video-", as.integer(stats::runif(1, 1, 1e9)))
+    shiny::addResourcePath(video_prefix, video_dir)
+
+    write_player_rows <- function(dt, file_name, columns) {
+      out <- data.table::copy(data.table::as.data.table(dt))
+      keep <- intersect(columns, names(out))
+      out <- out[, ..keep]
+      target <- file.path(video_dir, file_name)
+      con <- file(target, open = "wb")
+      on.exit(close(con), add = TRUE)
+      jsonlite::stream_out(as.data.frame(out), con, verbose = FALSE)
+      paste0("/", video_prefix, "/", file_name)
+    }
+
+    send_player_data <- function() {
+      shiny::isolate({
+        gaze <- data.table::copy(gaze_rv())
+        if (nrow(gaze) > 100000) gaze <- gaze[unique(round(seq(1, .N, length.out = 100000)))]
+        aoi_url <- write_player_rows(
+          aoi_rv(), "dynamic-aoi.ndjson",
+          c("aoi_group_id", "aoi_name", "shape_id", "time_ms", "start_ms", "end_ms", "x_min", "y_min", "x_max", "y_max", "valid_aoi")
+        )
+        gaze_url <- write_player_rows(gaze, "dynamic-gaze.ndjson", c("video_time_ms", "gaze_x", "gaze_y"))
+        session$sendCustomMessage("dynamic-aoi-player-data", list(
+          id = "dynamic-aoi-player",
+          videoId = "dynamic_aoi_video",
+          canvasId = "dynamic_aoi_canvas",
+          statusId = "dynamic_aoi_time",
+          aoiUrl = aoi_url,
+          gazeUrl = gaze_url,
+          screenWidth = input$screen_width %||% 1920,
+          screenHeight = input$screen_height %||% 1080,
+          nearestMs = input$nearest_aoi_ms %||% 120,
+          gazeWindowMs = input$gaze_window_ms %||% 120,
+          validOnly = isTRUE(input$valid_only)
+        ))
+      })
+    }
+
+    output$dynamic_video_player <- shiny::renderUI({
+      video_url <- video_url_rv()
+      if (is.null(video_url)) {
+        return(shiny::helpText("上传录屏视频和动态 AOI CSV，然后点击“读取并抽帧验证”。视频会在此处连续播放并实时叠加 AOI。"))
+      }
+      shiny::tagList(
+        shiny::tags$div(
+          style = "position:relative; width:100%; background:#111; line-height:0;",
+          shiny::tags$video(
+            id = "dynamic_aoi_video", src = video_url, controls = NA, preload = "metadata",
+            style = "display:block; width:100%; height:auto; max-height:72vh;"
+          ),
+          shiny::tags$canvas(
+            id = "dynamic_aoi_canvas",
+            style = "position:absolute; inset:0; width:100%; height:100%; pointer-events:none;"
+          )
+        ),
+        shiny::tags$p(shiny::tags$b("当前视频时间："), shiny::tags$span(id = "dynamic_aoi_time", "0 ms"))
+      )
+    })
 
     shiny::observeEvent(input$run_check, {
       shiny::req(input$aoi_file)
@@ -397,6 +641,15 @@ dynamic_aoi_validator_app <- function() {
         gaze_rv(data.table::data.table())
       }
 
+      if (!is.null(input$video_file)) {
+        ext <- tools::file_ext(input$video_file$name)
+        target <- file.path(video_dir, paste0("video", if (nzchar(ext)) paste0(".", ext) else ""))
+        file.copy(input$video_file$datapath, target, overwrite = TRUE)
+        video_url_rv(paste0("/", video_prefix, "/", utils::URLencode(basename(target), reserved = TRUE)))
+      } else {
+        video_url_rv(NULL)
+      }
+
       frame_plan <- make_frame_plan(aoi, interval_ms = input$frame_interval_ms, max_frames = input$max_frames, valid_only = FALSE)
       if (!is.null(input$video_file) && nrow(frame_plan) > 0) {
         out_dir <- file.path(tempdir(), paste0("daoi_frames_", as.integer(Sys.time())))
@@ -411,8 +664,13 @@ dynamic_aoi_validator_app <- function() {
       frames_rv(frame_plan)
       labels <- if (nrow(frame_plan) > 0) stats::setNames(seq_len(nrow(frame_plan)), sprintf("%03d | %.0f ms", frame_plan$frame_id, frame_plan$time_ms)) else character()
       shiny::updateSelectInput(session, "frame_select", choices = labels, selected = if (length(labels) > 0) labels[[1]] else character())
+      later::later(send_player_data, delay = 0.2)
       shiny::showNotification("动态 AOI 读取完成。没有上传眼动文件也可查看 AOI 有效性和录屏叠加。", type = "message")
     })
+
+    shiny::observeEvent(list(input$screen_width, input$screen_height, input$nearest_aoi_ms, input$gaze_window_ms, input$valid_only), {
+      if (nrow(aoi_rv()) > 0) send_player_data()
+    }, ignoreInit = TRUE)
 
     selected_frame <- shiny::reactive({
       fr <- frames_rv()
@@ -442,7 +700,11 @@ dynamic_aoi_validator_app <- function() {
       if (nrow(frames_rv()) == 0) cat("如未抽帧，请确认已上传视频且 ffmpeg 可用。AOI 有效性表仍可使用。\n")
     })
     output$quality_tbl <- DT::renderDT(DT::datatable(quality_rv()$summary, filter = "top", rownames = FALSE, options = list(scrollX = TRUE, pageLength = 12)))
-    output$invalid_tbl <- DT::renderDT(DT::datatable(quality_rv()$invalid_rows, filter = "top", rownames = FALSE, options = list(scrollX = TRUE, pageLength = 12)))
+    output$invalid_tbl <- DT::renderDT({
+      invalid <- quality_rv()$invalid_rows
+      if (nrow(invalid) > 5000) invalid <- head(invalid, 5000)
+      DT::datatable(invalid, filter = "top", rownames = FALSE, options = list(scrollX = TRUE, pageLength = 12))
+    })
     output$gap_tbl <- DT::renderDT(DT::datatable(quality_rv()$gaps, filter = "top", rownames = FALSE, options = list(scrollX = TRUE, pageLength = 12)))
     output$aoi_tbl <- DT::renderDT(DT::datatable(aoi_rv(), filter = "top", rownames = FALSE, options = list(scrollX = TRUE, pageLength = 12)))
     output$gaze_tbl <- DT::renderDT(DT::datatable(head(gaze_rv(), 1000), filter = "top", rownames = FALSE, options = list(scrollX = TRUE, pageLength = 12)))
