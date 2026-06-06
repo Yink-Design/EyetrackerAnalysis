@@ -15,5 +15,6 @@ if (length(missing_packages) > 0) {
 source("global.R", encoding = "UTF-8")
 source("R/core.R", encoding = "UTF-8")
 source("R/dynamic_aoi_video.R", encoding = "UTF-8")
+source("R/dynamic_aoi_video_v2.R", encoding = "UTF-8")
 
 dynamic_aoi_validator_app()
