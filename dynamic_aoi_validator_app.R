@@ -17,5 +17,6 @@ source("R/core.R", encoding = "UTF-8")
 source("R/dynamic_aoi_video.R", encoding = "UTF-8")
 source("R/dynamic_aoi_video_v2.R", encoding = "UTF-8")
 source("R/dynamic_aoi_video_v3.R", encoding = "UTF-8")
+source("R/dynamic_aoi_video_v4.R", encoding = "UTF-8")
 
 dynamic_aoi_validator_app()
