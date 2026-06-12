@@ -1,0 +1,11 @@
+Type,Source,Destination,Success,Note
+participant_csv,../../../../../../Project/UE5/Gallery/Saved/ExperimentData/A013_exp01_InspectQuestionResults.csv,../../../../../../Project/UE5/Gallery/Saved/ExperimentData/Participants/A013/CSV/A013_exp01_InspectQuestionResults.csv,1,copied
+participant_csv,../../../../../../Project/UE5/Gallery/Saved/ExperimentData/A013_exp02_Experiment2Results.csv,../../../../../../Project/UE5/Gallery/Saved/ExperimentData/Participants/A013/CSV/A013_exp02_Experiment2Results.csv,1,copied
+experiment_end_csv_filtered,../../../../../../Project/UE5/Gallery/Saved/ExperimentData/ExperimentEndEvents.csv,../../../../../../Project/UE5/Gallery/Saved/ExperimentData/Participants/A013/CSV/A013_ExperimentEndEvent.csv,1,filtered_rows_1
+dynamic_aoi,../../../../../../Project/UE5/Gallery/Saved/EyeTrackingAOI/A013_DynamicAOI.csv,../../../../../../Project/UE5/Gallery/Saved/ExperimentData/Participants/A013/AOI/A013_DynamicAOI.csv,1,copied
+formal_edf,../../../../../../Project/UE5/Gallery/Saved/ExperimentData/EDF/FM160641.EDF,../../../../../../Project/UE5/Gallery/Saved/ExperimentData/Participants/A013/EDF/FM160641.EDF,1,copied
+latest_edf_fallback,../../../../../../Project/UE5/Gallery/Saved/ExperimentData/EDF/FM160641.EDF,../../../../../../Project/UE5/Gallery/Saved/ExperimentData/Participants/A013/EDF/FM160641.EDF,1,copied
+latest_eyelink_marker_log,../../../../../../Project/UE5/Gallery/Saved/ExperimentLogs/EyeLinkMarkers_20260612_155757_814.log,../../../../../../Project/UE5/Gallery/Saved/ExperimentData/Participants/A013/Logs/EyeLinkMarkers_20260612_155757_814.log,1,copied
+screen_recording_log,../../../../../../Project/UE5/Gallery/Saved/ScreenRecordings/ScreenRecordingLog.csv,../../../../../../Project/UE5/Gallery/Saved/ExperimentData/Participants/A013/Logs/ScreenRecordingLog.csv,1,copied
+screen_recording,../../../../../../Project/UE5/Gallery/Saved/ScreenRecordings/A013_20260612_160729_screen.mkv,../../../../../../Project/UE5/Gallery/Saved/ExperimentData/Participants/A013/ScreenRecordings/A013_20260612_160729_screen.mkv,1,copied
+latest_screen_recording_fallback,../../../../../../Project/UE5/Gallery/Saved/ScreenRecordings/A013_20260612_160729_screen.mkv,../../../../../../Project/UE5/Gallery/Saved/ExperimentData/Participants/A013/ScreenRecordings/A013_20260612_160729_screen.mkv,1,copied
