@@ -23,7 +23,7 @@ empty_aoi <- function() data.table(
   aoi_group_id = character(), aoi_name = character(), shape_id = character(), reference_id = character(), shape_type = character(),
   x_min = numeric(), y_min = numeric(), x_max = numeric(), y_max = numeric(),
   center_x = numeric(), center_y = numeric(), radius = numeric(),
-  participant = character(), trial_id = character(), condition = character(), phase = character(),
+  participant = character(), experiment = character(), trial_id = character(), condition = character(), phase = character(),
   time_start = numeric(), time_end = numeric(), time_start_event = character(), time_end_event = character(), priority = numeric(), enabled = logical()
 )
 
@@ -166,14 +166,23 @@ event_in_windows <- function(start_time, end_time, windows) {
   hit
 }
 
-filtered_analysis <- function(parsed, reports, trial_value = "", phase_value = "") {
+filtered_analysis <- function(parsed, reports, experiment_value = "", trial_value = "", phase_value = "") {
+  experiment_value <- experiment_value %||% ""
   trial_value <- trial_value %||% ""
   phase_value <- phase_value %||% ""
   p <- parsed
+  p$trials <- copy(parsed$trials)
   p$phases <- copy(parsed$phases)
   p$events <- copy(parsed$events)
   p$samples <- copy(parsed$samples)
   p$fixations <- copy(parsed$fixations)
+  if (nzchar(experiment_value)) {
+    p$trials <- p$trials[experiment == experiment_value]
+    p$phases <- p$phases[experiment == experiment_value]
+    p$events <- p$events[trial_id %in% p$trials$trial_id]
+    p$samples <- p$samples[experiment == experiment_value]
+    p$fixations <- p$fixations[experiment == experiment_value]
+  }
   if (nzchar(trial_value)) {
     p$phases <- p$phases[p$phases$trial_id == trial_value]
     p$events <- p$events[p$events$trial_id == trial_value]
@@ -191,6 +200,7 @@ filtered_analysis <- function(parsed, reports, trial_value = "", phase_value = "
     for (nm in names(rep)) {
       if (is.data.frame(rep[[nm]])) {
         dt <- copy(as.data.table(rep[[nm]]))
+        if (nzchar(experiment_value) && "experiment" %in% names(dt)) dt <- dt[dt$experiment == experiment_value]
         if (nzchar(trial_value) && "trial_id" %in% names(dt)) dt <- dt[dt$trial_id == trial_value]
         if (nzchar(phase_value) && "phase" %in% names(dt)) dt <- dt[dt$phase == phase_value]
         rep[[nm]] <- dt
@@ -218,10 +228,14 @@ workflow_table <- function() {
 
 ui <- fluidPage(
   includeCSS("www/app.css"),
-  tags$head(tags$script(src = "dynamic-aoi-player.js?v=20260606-spatial-calibration")),
+  tags$head(tags$script(src = "dynamic-aoi-player.js?v=20260610-blob-seek")),
   titlePanel("EyeLink ASC 眼动分析工具"),
   sidebarLayout(
     sidebarPanel(
+      textInput("formal_package_dir", "正式被试目录路径", value = ""),
+      actionButton("load_formal_package", "加载正式被试目录"),
+      helpText("目录必须包含 DataCollectionManifest.csv；程序只读取该目录内部文件。"),
+      hr(),
       fileInput("asc_files", "上传 ASC 文件（支持多选）", accept = c(".asc", ".txt"), multiple = TRUE),
       helpText("当前单次上传上限约 1GB。大文件解析时会显示分阶段进度。"),
       fileInput("reference_file", "上传参考图（PNG/JPG，支持多张）", accept = c(".png", ".jpg", ".jpeg"), multiple = TRUE),
@@ -237,6 +251,7 @@ ui <- fluidPage(
       hr(),
       uiOutput("active_file_ui"),
       uiOutput("parsed_file_inventory_ui"),
+      selectInput("experiment_select", "当前查看 Experiment", choices = c("All" = "__all__"), selected = "__all__"),
       selectInput("trial_select", "当前查看 / 绑定 Trial", choices = c("All" = "__all__"), selected = "__all__"),
       selectInput("phase_select", "当前查看 Phase", choices = c("All" = "__all__"), selected = "__all__"),
       hr(),
@@ -247,7 +262,7 @@ ui <- fluidPage(
     mainPanel(
       tabsetPanel(
         tabPanel("工作流", br(), DTOutput("workflow_tbl")),
-        tabPanel("数据概览", br(), verbatimTextOutput("status"), h4("Quality Report"), DTOutput("quality_tbl"), h4("Metadata"), DTOutput("metadata_tbl"), h4("Trials"), DTOutput("trials_tbl"), h4("Phases"), DTOutput("phases_tbl")),
+        tabPanel("数据概览", br(), verbatimTextOutput("status"), h4("Package Inventory"), DTOutput("package_inventory_tbl"), h4("Package / Phase Warnings"), DTOutput("package_warning_tbl"), h4("Quality Report"), DTOutput("quality_tbl"), h4("Metadata"), DTOutput("metadata_tbl"), h4("Trials"), DTOutput("trials_tbl"), h4("Phases"), DTOutput("phases_tbl")),
         tabPanel("指标说明", br(), DTOutput("metric_tbl")),
         tabPanel("Trial / Phase 分析", br(), verbatimTextOutput("filter_status"), plotlyOutput("timeline_plot", height = 360), plotlyOutput("scanpath_plot", height = 420), plotlyOutput("heatmap_plot", height = 420), plotlyOutput("pupil_plot", height = 360), h4("Trial Report"), DTOutput("trial_report_tbl"), h4("Phase Report"), DTOutput("phase_report_tbl")),
         tabPanel("AOI 编辑", br(),
@@ -258,11 +273,12 @@ ui <- fluidPage(
               textInput("aoi_name", "AOI 名称", "兴趣区 1"),
               textInput("aoi_shape_id", "Shape ID", ""),
               selectInput("aoi_participant_bind", "批量规则 Participant（可选）", choices = c("All" = ""), selected = "", multiple = TRUE),
+              selectInput("aoi_experiment_bind", "批量规则 Experiment（可选）", choices = c("All" = ""), selected = "", multiple = TRUE),
               selectInput("aoi_condition_bind", "批量规则 Condition（可选）", choices = c("All" = ""), selected = "", multiple = TRUE),
               selectInput("aoi_trial_bind", "批量规则 Trial（可选）", choices = c("All" = ""), selected = "", multiple = TRUE),
               selectInput("aoi_phase_bind", "批量规则 Phase（可选）", choices = c("All" = ""), selected = "", multiple = TRUE),
-              selectInput("aoi_time_start_event", "动态起点", choices = c("手动/不使用" = "", "phase_start", "trial_start", "LOADING_START", "PROGRESSIVE_USABLE", "QUESTION_START_q1", "QUESTION_START_q2", "LOADING_COMPLETE", "VIEWER_ENTER"), selected = ""),
-              selectInput("aoi_time_end_event", "动态终点", choices = c("手动/不使用" = "", "phase_end", "trial_end", "LOADING_COMPLETE", "PROGRESSIVE_USABLE", "QUESTION_START_q1", "QUESTION_START_q2", "QUESTION_SUBMIT_q1", "QUESTION_SUBMIT_q2", "VIEWER_EXIT"), selected = ""),
+              selectInput("aoi_time_start_event", "动态起点", choices = c("手动/不使用" = "", "phase_start", "trial_start", "LOADING_START", "PROGRESSIVE_USABLE", "QUESTION_START_q1", "QUESTION_START_q2", "LOADING_COMPLETE", "VIEWER_ENTER", "EXP2_LOADING_START", "EXP2_STAGE_1_START", "EXP2_STAGE_2_START", "EXP2_PROGRESSIVE_USABLE", "EXP2_STAGE_3_START", "EXP2_LOADING_COMPLETE"), selected = ""),
+              selectInput("aoi_time_end_event", "动态终点", choices = c("手动/不使用" = "", "phase_end", "trial_end", "LOADING_COMPLETE", "PROGRESSIVE_USABLE", "QUESTION_START_q1", "QUESTION_START_q2", "QUESTION_SUBMIT_q1", "QUESTION_SUBMIT_q2", "VIEWER_EXIT", "EXP2_STAGE_1_START", "EXP2_STAGE_2_START", "EXP2_STAGE_3_START", "EXP2_LOADING_COMPLETE", "EXP2_SUBMIT_SELECTION"), selected = ""),
               numericInput("circle_radius", "圆形半径", 80, min = 1),
               numericInput("aoi_time_start", "AOI 起始时间（可选）", NA),
               numericInput("aoi_time_end", "AOI 结束时间（可选）", NA),
@@ -294,7 +310,7 @@ ui <- fluidPage(
         ),
         tabPanel("AOI 分析", br(), plotOutput("aoi_overlay_plot", height = 460), h4("AOI Report"), DTOutput("aoi_report_tbl")),
         tabPanel("动态 AOI 验证", br(), dynamic_aoi_validator_module_ui("dynamic_validator")),
-        tabPanel("答题合并", br(), h4("时间戳 / 题目匹配检查"), DTOutput("behavior_check_tbl"), h4("眼动 + 行为综合表"), DTOutput("merged_behavior_tbl"), h4("Condition Summary"), DTOutput("condition_summary_tbl")),
+        tabPanel("答题合并", br(), h4("EXP1 时间戳 / 题目匹配检查"), DTOutput("behavior_check_tbl"), h4("EXP1 眼动 + 行为综合表"), DTOutput("merged_behavior_tbl"), h4("EXP1 Condition Summary"), DTOutput("condition_summary_tbl"), hr(), h4("EXP2 Marker 对齐"), DTOutput("exp2_alignment_tbl"), h4("EXP2 眼动 + 选择综合表"), DTOutput("exp2_behavior_tbl"), h4("EXP2 Condition Summary"), DTOutput("exp2_summary_tbl"), hr(), h4("正式动态 AOI 对齐"), DTOutput("dynamic_aoi_alignment_tbl"), h4("正式动态 AOI 汇总"), DTOutput("dynamic_aoi_summary_tbl")),
         tabPanel("原始报表", br(), h4("Fixation"), DTOutput("fix_tbl"), h4("Saccade"), DTOutput("sac_tbl"), h4("Blink"), DTOutput("blink_tbl"), h4("Messages / Events"), DTOutput("event_tbl")),
         tabPanel("DataViewer 对齐检查", br(),
           fluidRow(
@@ -326,10 +342,41 @@ server <- function(input, output, session) {
   aoi_dt <- reactiveVal(empty_aoi())
   behavior_items <- reactiveVal(list())
   behavior_dt <- reactiveVal(data.table())
+  formal_package_items <- reactiveVal(list())
   reference_imgs <- reactiveVal(list())
   dv_alignment <- reactiveVal(list())
   dv_alignment_file <- reactiveVal(NULL)
-  dynamic_aoi_validator_module_server("dynamic_validator")
+  dynamic_aoi_validator_module_server("dynamic_validator", package_reactive = reactive({
+    packages <- formal_package_items()
+    if (length(packages) == 0) NULL else packages[[length(packages)]]
+  }))
+
+  observeEvent(input$load_formal_package, {
+    req(nzchar(trimws(input$formal_package_dir %||% "")))
+    root <- trimws(input$formal_package_dir)
+    withProgress(message = "正在加载正式被试目录...", value = 0, {
+      pkg <- read_formal_participant_package(root, keep_samples = TRUE, progress = function(detail, value) {
+        setProgress(value = min(0.72, value * 0.72), detail = detail)
+      })
+      incProgress(0.08, detail = "生成 EXP1 / EXP2 报告")
+      reports <- formal_package_reports(pkg, bin_ms = input$bin_ms, baseline_ms = input$baseline_ms)
+      label <- paste0(pkg$participant, " [formal]")
+      parsed_list <- parsed_items(); parsed_list[[label]] <- pkg$parsed; parsed_items(parsed_list)
+      reports_list <- report_items(); reports_list[[label]] <- with_source(reports, label); report_items(reports_list)
+      packages <- formal_package_items(); packages[[label]] <- pkg; formal_package_items(packages)
+      info <- parsed_file_info()
+      asc_size <- first_non_na(pkg$inventory[type == "asc"]$size, NA_real_)
+      info <- info[name != label]
+      parsed_file_info(rbindlist(list(info, data.table(name = label, size = asc_size)), fill = TRUE))
+      if (nrow(pkg$exp1_behavior) > 0) {
+        items <- behavior_items(); items[[paste0(label, "_exp1")]] <- pkg$exp1_behavior
+        behavior_items(items); behavior_dt(rbindlist(items, fill = TRUE))
+      }
+      updateSelectInput(session, "active_file", choices = names(parsed_list), selected = label)
+      incProgress(0.20, detail = "正式被试目录加载完成")
+    })
+    showNotification("正式被试目录已加载；动态 AOI 正式结果已加入导出表。", type = "message")
+  })
 
   observeEvent(input$reference_file, {
     req(input$reference_file)
@@ -356,6 +403,7 @@ server <- function(input, output, session) {
     if (!is.null(obj$aoi)) aoi_dt(normalize_aoi(obj$aoi))
     if (!is.null(obj$behavior)) behavior_dt(as.data.table(obj$behavior))
     if (!is.null(obj$behavior_items)) behavior_items(obj$behavior_items)
+    if (!is.null(obj$formal_package_items)) formal_package_items(obj$formal_package_items)
     if (!is.null(obj$reference_imgs)) {
       reference_imgs(obj$reference_imgs)
       first_ref <- if (length(obj$reference_imgs) > 0) names(obj$reference_imgs)[[1]] else ""
@@ -464,6 +512,12 @@ server <- function(input, output, session) {
     if (identical(x, "__all__")) "" else x
   })
 
+  selected_experiment <- reactive({
+    x <- input$experiment_select
+    if (is.null(x)) x <- "__all__"
+    if (identical(x, "__all__")) "" else x
+  })
+
   selected_phase <- reactive({
     x <- input$phase_select
     if (is.null(x)) x <- "__all__"
@@ -476,6 +530,7 @@ server <- function(input, output, session) {
     if (length(x) == 0) "" else paste(x, collapse = ";")
   }
   selected_aoi_participant <- reactive(bind_value(input$aoi_participant_bind))
+  selected_aoi_experiment <- reactive(bind_value(input$aoi_experiment_bind))
   selected_aoi_condition <- reactive(bind_value(input$aoi_condition_bind))
   selected_aoi_trial <- reactive(bind_value(input$aoi_trial_bind))
   selected_aoi_phase <- reactive(bind_value(input$aoi_phase_bind))
@@ -493,16 +548,25 @@ server <- function(input, output, session) {
     first_non_na(p$trials[trial_id == tr]$condition, "")
   })
 
+  selected_trial_experiment <- reactive({
+    p <- active_parsed()
+    tr <- selected_trial()
+    if (is.null(p) || !nzchar(tr)) return(selected_experiment())
+    first_non_na(p$trials[trial_id == tr]$experiment, selected_experiment())
+  })
+
   analysis_view <- reactive({
     req(active_parsed(), current_reports())
-    filtered_analysis(active_parsed(), current_reports(), selected_trial(), selected_phase())
+    filtered_analysis(active_parsed(), current_reports(), selected_experiment(), selected_trial(), selected_phase())
   })
 
   filtered_table <- function(x, use_phase = TRUE) {
     if (is.null(x) || !is.data.frame(x) || nrow(x) == 0) return(x)
     dt <- data.table::copy(data.table::as.data.table(x))
+    ex <- selected_experiment()
     tr <- selected_trial()
     ph <- selected_phase()
+    if (nzchar(ex) && "experiment" %in% names(dt)) dt <- dt[dt$experiment == ex]
     if (nzchar(tr) && "trial_id" %in% names(dt)) dt <- dt[dt$trial_id == tr]
     if (use_phase && nzchar(ph) && "phase" %in% names(dt)) dt <- dt[dt$phase == ph]
     dt
@@ -560,16 +624,29 @@ server <- function(input, output, session) {
   observeEvent(active_parsed(), {
     p <- active_parsed()
     if (is.null(p)) return()
+    updateSelectInput(session, "experiment_select", choices = c("All" = "__all__", unique(p$trials$experiment)), selected = "__all__")
     updateSelectInput(session, "trial_select", choices = c("All" = "__all__", unique(p$trials$trial_id)), selected = "__all__")
     updateSelectInput(session, "phase_select", choices = c("All" = "__all__", unique(p$phases$phase)), selected = "__all__")
     updateSelectInput(session, "aoi_participant_bind", choices = c("All" = "", unique(p$trials$participant)), selected = character())
+    updateSelectInput(session, "aoi_experiment_bind", choices = c("All" = "", unique(p$trials$experiment)), selected = character())
     updateSelectInput(session, "aoi_condition_bind", choices = c("All" = "", unique(p$trials$condition)), selected = character())
     updateSelectInput(session, "aoi_trial_bind", choices = c("All" = "", unique(p$trials$trial_id)), selected = character())
     updateSelectInput(session, "aoi_phase_bind", choices = c("All" = "", unique(p$phases$phase)), selected = character())
   }, ignoreNULL = TRUE)
 
+  observeEvent(input$experiment_select, {
+    p <- active_parsed()
+    if (is.null(p)) return()
+    ex <- selected_experiment()
+    trials <- if (nzchar(ex)) p$trials[experiment == ex]$trial_id else p$trials$trial_id
+    phases <- if (nzchar(ex)) p$phases[experiment == ex]$phase else p$phases$phase
+    updateSelectInput(session, "trial_select", choices = c("All" = "__all__", unique(trials)), selected = "__all__")
+    updateSelectInput(session, "phase_select", choices = c("All" = "__all__", unique(phases)), selected = "__all__")
+  }, ignoreInit = TRUE)
+
   output$filter_status <- renderPrint({
     req(active_parsed())
+    cat("当前筛选 Experiment:", ifelse(nzchar(selected_experiment()), selected_experiment(), "All"), "\n")
     cat("当前筛选 Trial:", ifelse(nzchar(selected_trial()), selected_trial(), "All"), "\n")
     cat("当前筛选 Phase:", ifelse(nzchar(selected_phase()), selected_phase(), "All"), "\n")
   })
@@ -600,6 +677,14 @@ server <- function(input, output, session) {
 
   output$metadata_tbl <- render_report("metadata")
   output$quality_tbl <- render_report("quality_report")
+  output$package_inventory_tbl <- render_report("package_inventory")
+  output$package_warning_tbl <- renderDT({
+    rep <- current_reports()
+    pieces <- list(rep$phase_quality_report, rep$dynamic_aoi_alignment_report)
+    pieces <- pieces[vapply(pieces, is.data.frame, logical(1))]
+    req(length(pieces) > 0)
+    datatable(rbindlist(pieces, fill = TRUE), filter = "top", rownames = FALSE, options = list(scrollX = TRUE, pageLength = 10))
+  })
   output$trial_report_tbl <- renderDT({
     rep <- analysis_view()$reports
     req(rep$trial_report)
@@ -707,6 +792,7 @@ server <- function(input, output, session) {
     if ("reference_id" %in% names(row)) updateSelectInput(session, "reference_select", selected = row$reference_id)
     split_bind <- function(x) { x <- x %||% ""; if (!nzchar(x)) character() else unlist(strsplit(x, "\\s*[;,|]\\s*")) }
     updateSelectInput(session, "aoi_participant_bind", selected = split_bind(row$participant))
+    updateSelectInput(session, "aoi_experiment_bind", selected = split_bind(row$experiment))
     updateSelectInput(session, "aoi_condition_bind", selected = split_bind(row$condition))
     updateSelectInput(session, "aoi_trial_bind", selected = split_bind(row$trial_id))
     updateSelectInput(session, "aoi_phase_bind", selected = split_bind(row$phase))
@@ -744,7 +830,7 @@ server <- function(input, output, session) {
       paste0(ifelse(nzchar(time_start_event), time_start_event, "manual"), " -> ", ifelse(nzchar(time_end_event), time_end_event, "manual")),
       paste0(ifelse(is.na(time_start), "All", as.character(time_start)), " -> ", ifelse(is.na(time_end), "All", as.character(time_end)))
     )]
-    cols <- c("row_id", "selected_aoi", "binding_scope", "enabled", "aoi_group_id", "aoi_name", "shape_id", "reference_id", "participant", "trial_id", "condition", "phase", "time_window")
+    cols <- c("row_id", "selected_aoi", "binding_scope", "enabled", "aoi_group_id", "aoi_name", "shape_id", "reference_id", "participant", "experiment", "trial_id", "condition", "phase", "time_window")
     out <- out[, ..cols]
     setorder(out, -enabled, binding_scope, participant, condition, trial_id, phase)
     out
@@ -791,7 +877,7 @@ server <- function(input, output, session) {
       shape_type = shape_type,
       x_min = coords$x_min, y_min = coords$y_min, x_max = coords$x_max, y_max = coords$y_max,
       center_x = coords$center_x, center_y = coords$center_y, radius = coords$radius,
-      participant = selected_aoi_participant(), trial_id = selected_aoi_trial(), condition = selected_aoi_condition(), phase = selected_aoi_phase(),
+      participant = selected_aoi_participant(), experiment = selected_aoi_experiment(), trial_id = selected_aoi_trial(), condition = selected_aoi_condition(), phase = selected_aoi_phase(),
       time_start = input$aoi_time_start, time_end = input$aoi_time_end,
       time_start_event = input$aoi_time_start_event %||% "", time_end_event = input$aoi_time_end_event %||% "",
       priority = input$aoi_priority %||% 0, enabled = isTRUE(input$aoi_enabled)
@@ -821,6 +907,7 @@ server <- function(input, output, session) {
       shape_id = ifelse(nzchar(trimws(input$aoi_shape_id %||% "")), trimws(input$aoi_shape_id), shape_id),
       reference_id = current_reference_id(),
       participant = selected_aoi_participant(),
+      experiment = selected_aoi_experiment(),
       trial_id = selected_aoi_trial(),
       condition = selected_aoi_condition(),
       phase = selected_aoi_phase(),
@@ -846,6 +933,7 @@ server <- function(input, output, session) {
       shape_id = ifelse(nzchar(trimws(input$aoi_shape_id %||% "")), trimws(input$aoi_shape_id), shape_id),
       reference_id = current_reference_id(),
       participant = selected_aoi_participant(),
+      experiment = selected_aoi_experiment(),
       trial_id = selected_aoi_trial(),
       condition = selected_aoi_condition(),
       phase = selected_aoi_phase(),
@@ -875,6 +963,7 @@ server <- function(input, output, session) {
     source_is_template <- !nzchar(dt$participant[idx] %||% "") && !nzchar(dt$trial_id[idx] %||% "")
     row[, `:=`(
       participant = active_participant(),
+      experiment = selected_trial_experiment(),
       trial_id = tr,
       condition = selected_trial_condition(),
       phase = selected_aoi_phase(),
@@ -885,7 +974,7 @@ server <- function(input, output, session) {
       priority = input$aoi_priority %||% priority,
       enabled = TRUE
     )]
-    keys <- c("aoi_group_id", "shape_id", "participant", "trial_id", "condition", "phase", "time_start_event", "time_end_event")
+    keys <- c("aoi_group_id", "shape_id", "participant", "experiment", "trial_id", "condition", "phase", "time_start_event", "time_end_event")
     keys <- intersect(keys, names(dt))
     if (length(keys) > 0 && nrow(dt) > 0) {
       dt[, .row_key := do.call(paste, c(.SD, sep = "\r")), .SDcols = keys]
@@ -943,6 +1032,11 @@ server <- function(input, output, session) {
   output$behavior_check_tbl <- render_report("behavior_check_report")
   output$merged_behavior_tbl <- render_report("merged_eye_behavior_report", 1000)
   output$condition_summary_tbl <- render_report("condition_summary")
+  output$exp2_alignment_tbl <- render_report("exp2_alignment_report", 1000)
+  output$exp2_behavior_tbl <- render_report("exp2_eye_behavior_report", 1000)
+  output$exp2_summary_tbl <- render_report("exp2_condition_summary")
+  output$dynamic_aoi_alignment_tbl <- render_report("dynamic_aoi_alignment_report")
+  output$dynamic_aoi_summary_tbl <- render_report("dynamic_aoi_summary", 1000)
 
   observeEvent(input$run_dv_compare, {
     req(active_parsed(), current_reports())
@@ -1039,6 +1133,7 @@ server <- function(input, output, session) {
       aoi = aoi_dt(),
       behavior = behavior_dt(),
       behavior_items = behavior_items(),
+      formal_package_items = formal_package_items(),
       reference_imgs = reference_imgs(),
       bin_ms = input$bin_ms,
       baseline_ms = input$baseline_ms,

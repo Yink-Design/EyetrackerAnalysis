@@ -1,0 +1,4 @@
+*.EDF filter=lfs diff=lfs merge=lfs -text
+*.edf filter=lfs diff=lfs merge=lfs -text
+*.asc filter=lfs diff=lfs merge=lfs -text
+*.mkv filter=lfs diff=lfs merge=lfs -text

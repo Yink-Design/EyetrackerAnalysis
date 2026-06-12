@@ -30,3 +30,20 @@ h1, h2, h3, h4 {
 .btn {
   border-radius: 6px;
 }
+
+.dynamic-aoi-seek-controls {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 42px;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0 4px;
+}
+
+.dynamic-aoi-seek-controls .btn {
+  width: 42px;
+  padding: 5px;
+}
+
+.dynamic-aoi-seek-controls input[type="range"] {
+  width: 100%;
+}

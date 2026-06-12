@@ -162,8 +162,12 @@ shiny::runApp()
 - `AOI 整体水平偏移 / px` 与 `AOI 整体垂直偏移 / px`：修正录屏窗口边框、标题栏等造成的坐标原点差异。
 - `AOI 横向缩放 / %` 与 `AOI 纵向缩放 / %`：以画面中心为基准修正坐标比例。
 - `叠加眼动窗口 ±ms`：仅控制当前视频时间附近显示的眼动点范围，不会移动 AOI。
+- ASC 的绝对 EyeLink 时间默认自动映射到视频起点；状态区会显示 gaze 与 AOI 的视频时间范围，便于继续手动校准。
+- 视频下方提供独立进度滑杆和前后 5 秒跳转按钮；MP4 上传后会尝试转换为 faststart 版本以提高定位可靠性。
 
 UE 动态 AOI 坐标通常以游戏 Viewport 左上角为原点。正式录制建议使用 Standalone 全屏，并保持 UE Viewport、录屏和 EyeLink `DISPLAY_COORDS` 分辨率一致。
+
+统一动态 AOI CSV 支持按实验、条件、Trial、AOI Scope 和加载段筛选。动态加载段仅识别条件 `B`、`E1`、`E3`；选择加载段后视频会跳转到对应起点。上传 gaze CSV 或 ASC 后，还可导出 gaze × AOI 命中明细与汇总。
 
 ## 输入文件
 

@@ -42,6 +42,11 @@ if (!exists("%||%", mode = "function")) {
   dt[[col]]
 }
 
+.daoi_table <- function(x) {
+  if (is.null(x) || !is.data.frame(x)) return(data.table::data.table())
+  data.table::copy(data.table::as.data.table(x))
+}
+
 .daoi_as_bool <- function(x, default = NA) {
   if (length(x) == 0) return(logical())
   if (is.logical(x)) return(x)
@@ -54,11 +59,12 @@ if (!exists("%||%", mode = "function")) {
 
 .daoi_empty <- function() {
   data.table::data.table(
-    row_id = integer(), participant = character(), trial_id = character(), condition = character(), phase = character(),
-    aoi_group_id = character(), aoi_name = character(), shape_id = character(), time_ms = numeric(), start_ms = numeric(), end_ms = numeric(),
+    row_id = integer(), participant = character(), trial_id = character(), experiment_code = character(), condition = character(), phase = character(),
+    aoi_scope = character(), aoi_group_id = character(), aoi_name = character(), shape_id = character(), time_ms = numeric(), start_ms = numeric(), end_ms = numeric(),
     x_min = numeric(), y_min = numeric(), x_max = numeric(), y_max = numeric(),
     projection_valid = logical(), is_clamped = logical(), enabled = logical(), visible = logical(), valid_aoi = logical(),
-    invalid_reason = character(), source_file = character()
+    invalid_reason = character(), warning_reason = character(), target_content_index = numeric(),
+    target_display_index = numeric(), slot_permutation = character(), source_file = character()
   )
 }
 
@@ -87,9 +93,14 @@ standardize_dynamic_aoi <- function(x, time_unit = c("ms", "sec"), source_file =
 
   participant <- get_chr(c("participant", "participant_id", "subject", "subj", "pid"))
   trial_id <- get_chr(c("trial_id", "trial", "trialid", "out_trial", "trial_name"))
-  condition <- get_chr(c("condition", "loading_condition", "applied_loading_condition", "strategy", "loading_strategy"))
+  condition <- toupper(get_chr(c("condition", "loading_condition", "applied_loading_condition", "strategy", "loading_strategy")))
+  experiment_code <- toupper(get_chr(c("experiment_code", "experiment", "exp")))
+  experiment_code[!nzchar(experiment_code) & condition == "B"] <- "EXP1"
+  experiment_code[!nzchar(experiment_code) & grepl("^E[1-4](_|$)", condition)] <- "EXP2"
   phase <- get_chr(c("phase", "phase_name"), "loading")
   aoi_group_id <- get_chr(c("aoi_group_id", "aoi_id", "aoi", "aoi_group", "name", "label"), "dynamic_aoi")
+  aoi_scope <- get_chr(c("aoi_scope", "aoi_group_id", "aoi_id", "aoi"), "")
+  aoi_scope[!nzchar(aoi_scope)] <- aoi_group_id[!nzchar(aoi_scope)]
   aoi_name <- get_chr(c("aoi_name", "aoi_label", "display_name"), "Dynamic AOI")
   shape_id <- get_chr(c("shape_id", "id", "row_id", "frame_id"), "")
 
@@ -109,9 +120,9 @@ standardize_dynamic_aoi <- function(x, time_unit = c("ms", "sec"), source_file =
   x_max <- ifelse(is.na(x_max) & is.finite(x_min) & is.finite(w), x_min + w, x_max)
   y_max <- ifelse(is.na(y_max) & is.finite(y_min) & is.finite(h), y_min + h, y_max)
 
-  start_ms <- get_num(c("start_ms", "rel_start_ms", "relative_start_ms", "time_start_ms", "aoi_start_ms", "frame_start_ms", "start_time_ms"))
-  end_ms <- get_num(c("end_ms", "rel_end_ms", "relative_end_ms", "time_end_ms", "aoi_end_ms", "frame_end_ms", "end_time_ms"))
-  time_ms <- get_num(c("time_ms", "rel_ms", "relative_ms", "relative_time_ms", "timestamp_ms", "video_time_ms", "elapsed_ms", "frame_time_ms", "time"))
+  start_ms <- get_num(c("video_time_start_ms", "start_ms", "rel_start_ms", "relative_start_ms", "time_start_ms", "aoi_start_ms", "frame_start_ms", "start_time_ms"))
+  end_ms <- get_num(c("video_time_end_ms", "end_ms", "rel_end_ms", "relative_end_ms", "time_end_ms", "aoi_end_ms", "frame_end_ms", "end_time_ms"))
+  time_ms <- get_num(c("time_ms", "video_time_ms", "video_time_mid_ms", "rel_ms", "relative_ms", "relative_time_ms", "timestamp_ms", "elapsed_ms", "frame_time_ms", "time"))
   frame_index <- get_num(c("frame", "frame_index", "frame_id"))
 
   if (all(is.na(time_ms)) && any(is.finite(start_ms) | is.finite(end_ms))) {
@@ -133,49 +144,55 @@ standardize_dynamic_aoi <- function(x, time_unit = c("ms", "sec"), source_file =
   enabled <- .daoi_as_bool(.daoi_get(dt, c("enabled", "enable", "active", "is_active"), TRUE), TRUE)
   visible <- .daoi_as_bool(.daoi_get(dt, c("visible", "is_visible", "shown", "is_shown"), NA), NA)
   visible[is.na(visible)] <- enabled[is.na(visible)] %||% TRUE
+  target_content_index <- get_num(c("target_content_index"))
+  target_display_index <- get_num(c("target_display_index"))
+  slot_permutation <- get_chr(c("slot_permutation"))
 
   out <- data.table::data.table(
-    row_id = seq_len(n), participant = participant, trial_id = trial_id, condition = condition, phase = phase,
-    aoi_group_id = aoi_group_id, aoi_name = aoi_name, shape_id = ifelse(nzchar(shape_id), shape_id, paste0("row_", seq_len(n))),
+    row_id = seq_len(n), participant = participant, trial_id = trial_id, experiment_code = experiment_code, condition = condition, phase = phase,
+    aoi_scope = aoi_scope, aoi_group_id = aoi_group_id, aoi_name = aoi_name, shape_id = ifelse(nzchar(shape_id), shape_id, paste0("row_", seq_len(n))),
     time_ms = time_ms, start_ms = start_ms, end_ms = end_ms,
     x_min = x_min, y_min = y_min, x_max = x_max, y_max = y_max,
     projection_valid = projection_valid, is_clamped = is_clamped, enabled = enabled, visible = visible,
+    target_content_index = target_content_index, target_display_index = target_display_index, slot_permutation = slot_permutation,
     source_file = source_file
   )
-  for (nm in c("participant", "trial_id", "condition", "phase", "aoi_group_id", "aoi_name", "shape_id", "source_file")) {
+  for (nm in c("participant", "trial_id", "experiment_code", "condition", "phase", "aoi_scope", "aoi_group_id", "aoi_name", "shape_id", "slot_permutation", "source_file")) {
     out[[nm]][is.na(out[[nm]])] <- ""
   }
   data.table::set(out, j = "width", value = abs(out$x_max - out$x_min))
   data.table::set(out, j = "height", value = abs(out$y_max - out$y_min))
   data.table::set(out, j = "area", value = abs(out$x_max - out$x_min) * abs(out$y_max - out$y_min))
-  out[, invalid_reason := ""]
+  data.table::set(out, j = "invalid_reason", value = "")
   out[enabled != TRUE, invalid_reason := paste0(invalid_reason, ";disabled")]
   out[visible != TRUE, invalid_reason := paste0(invalid_reason, ";hidden")]
   out[projection_valid != TRUE, invalid_reason := paste0(invalid_reason, ";projection_invalid")]
-  out[is_clamped == TRUE, invalid_reason := paste0(invalid_reason, ";clamped")]
   out[!is.finite(x_min) | !is.finite(y_min) | !is.finite(x_max) | !is.finite(y_max), invalid_reason := paste0(invalid_reason, ";missing_coordinates")]
   out[is.finite(width) & is.finite(height) & (width <= 0 | height <= 0), invalid_reason := paste0(invalid_reason, ";non_positive_area")]
   out[, invalid_reason := sub("^;", "", invalid_reason)]
-  out[, valid_aoi := invalid_reason == ""]
+  data.table::set(out, j = "valid_aoi", value = out$invalid_reason == "")
+  data.table::set(out, j = "warning_reason", value = ifelse(out$is_clamped == TRUE, "clamped", ""))
   out[]
 }
 
 validate_dynamic_aoi <- function(aoi, screen_width = 1920, screen_height = 1080, gap_threshold_ms = 250) {
   .daoi_need_pkg("data.table")
-  aoi <- data.table::copy(data.table::as.data.table(aoi))
+  aoi <- .daoi_table(aoi)
   if (nrow(aoi) == 0) {
-    return(list(summary = data.table::data.table(), invalid_rows = data.table::data.table(), gaps = data.table::data.table()))
+    return(list(rows = data.table::data.table(), summary = data.table::data.table(), invalid_rows = data.table::data.table(), gaps = data.table::data.table()))
   }
-  aoi[, outside_screen := valid_aoi & (x_min < 0 | y_min < 0 | x_max > screen_width | y_max > screen_height)]
+  data.table::set(aoi, j = "outside_screen", value = aoi$x_max <= 0 | aoi$y_max <= 0 | aoi$x_min >= screen_width | aoi$y_min >= screen_height)
+  data.table::set(aoi, j = "partly_outside_screen", value = !aoi$outside_screen & (aoi$x_min < 0 | aoi$y_min < 0 | aoi$x_max > screen_width | aoi$y_max > screen_height))
   aoi[outside_screen == TRUE, invalid_reason := ifelse(nzchar(invalid_reason), paste(invalid_reason, "outside_screen", sep = ";"), "outside_screen")]
-  aoi[, valid_aoi := invalid_reason == ""]
-  key_cols <- intersect(c("participant", "trial_id", "condition", "phase", "aoi_group_id"), names(aoi))
+  aoi[partly_outside_screen == TRUE, warning_reason := ifelse(nzchar(warning_reason), paste(warning_reason, "partly_outside_screen", sep = ";"), "partly_outside_screen")]
+  data.table::set(aoi, j = "valid_aoi", value = aoi$invalid_reason == "")
+  key_cols <- intersect(c("participant", "trial_id", "experiment_code", "condition", "phase", "aoi_scope", "aoi_group_id"), names(aoi))
   if (length(key_cols) == 0) key_cols <- "aoi_group_id"
   summary <- aoi[, .(
     n_rows = .N,
     n_valid = sum(valid_aoi, na.rm = TRUE),
     n_projection_invalid = sum(grepl("projection_invalid", invalid_reason), na.rm = TRUE),
-    n_clamped = sum(grepl("clamped", invalid_reason), na.rm = TRUE),
+    n_clamped = sum(is_clamped == TRUE, na.rm = TRUE),
     n_outside_screen = sum(grepl("outside_screen", invalid_reason), na.rm = TRUE),
     valid_ratio = round(sum(valid_aoi, na.rm = TRUE) / .N, 4),
     first_time_ms = suppressWarnings(min(time_ms, na.rm = TRUE)),
@@ -196,7 +213,7 @@ validate_dynamic_aoi <- function(aoi, screen_width = 1920, screen_height = 1080,
       gap_ms = diff(time_ms)
     ), by = key_cols][gap_ms > gap_threshold_ms]
   }
-  list(summary = summary[], invalid_rows = aoi[nzchar(invalid_reason)], gaps = gaps[])
+  list(rows = aoi[], summary = summary[], invalid_rows = aoi[nzchar(invalid_reason) | nzchar(warning_reason)], gaps = gaps[])
 }
 
 read_gaze_table <- function(file, time_unit = c("ms", "sec"), source_file = basename(file)) {
@@ -211,16 +228,74 @@ read_gaze_table <- function(file, time_unit = c("ms", "sec"), source_file = base
     return(out[])
   }
   dt <- data.table::fread(file, encoding = "UTF-8", na.strings = c("", "NA", "NaN", "."))
-  names(dt) <- .daoi_norm_names(names(dt))
+  data.table::setnames(dt, .daoi_norm_names(names(dt)))
   n <- nrow(dt)
   get_num <- function(cands, default = NA_real_) .daoi_as_num(.daoi_get(dt, cands, default))
   time_ms <- get_num(c("time_ms", "time", "timestamp_ms", "rel_ms", "relative_time_ms", "video_time_ms", "elapsed_ms"))
-  gaze_x <- get_num(c("gaze_x", "x", "gx", "screen_x", "fix_x", "CURRENT_FIX_X"))
-  gaze_y <- get_num(c("gaze_y", "y", "gy", "screen_y", "fix_y", "CURRENT_FIX_Y"))
+  gaze_x <- get_num(c("gaze_x", "x", "gx", "screen_x", "fix_x", "current_fix_x"))
+  gaze_y <- get_num(c("gaze_y", "y", "gy", "screen_y", "fix_y", "current_fix_y"))
   pupil <- get_num(c("pupil", "pupil_area", "pa", "pupil_size"))
   if (time_unit == "sec") time_ms <- time_ms * 1000
   data.table::data.table(time_ms = time_ms, gaze_x = gaze_x, gaze_y = gaze_y, pupil = pupil,
     valid_gaze = is.finite(gaze_x) & is.finite(gaze_y), source_file = source_file)
+}
+
+build_dynamic_aoi_segments <- function(aoi_dt) {
+  .daoi_need_pkg("data.table")
+  aoi <- data.table::copy(data.table::as.data.table(aoi_dt))
+  if (nrow(aoi) == 0) return(data.table::data.table())
+  for (nm in c("participant", "trial_id", "experiment_code", "condition", "phase", "aoi_scope")) {
+    if (!nm %in% names(aoi)) data.table::set(aoi, j = nm, value = "")
+  }
+  aoi <- aoi[toupper(condition) == "B" | grepl("^E[123](_|$)", toupper(condition))]
+  if (nrow(aoi) == 0) return(data.table::data.table())
+  keys <- c("participant", "trial_id", "experiment_code", "condition", "phase")
+  segments <- aoi[, .(
+    start_ms = suppressWarnings(min(c(start_ms, time_ms), na.rm = TRUE)),
+    end_ms = suppressWarnings(max(c(end_ms, time_ms), na.rm = TRUE)),
+    aoi_scopes = paste(sort(unique(aoi_scope[nzchar(aoi_scope)])), collapse = ", "),
+    n_rows = .N,
+    n_valid = sum(valid_aoi == TRUE, na.rm = TRUE),
+    valid_ratio = round(sum(valid_aoi == TRUE, na.rm = TRUE) / .N, 4)
+  ), by = keys]
+  segments[!is.finite(start_ms), start_ms := NA_real_]
+  segments[!is.finite(end_ms), end_ms := NA_real_]
+  segments[, duration_ms := end_ms - start_ms]
+  segments[, segment_id := paste(participant, trial_id, experiment_code, condition, phase, sep = "|")]
+  segments[, segment_label := sprintf("%s | %s | %s | %.1fs-%.1fs", experiment_code, trial_id, condition, start_ms / 1000, end_ms / 1000)]
+  data.table::setcolorder(segments, c("segment_id", keys, "segment_label", "start_ms", "end_ms", "duration_ms", "aoi_scopes", "n_rows", "n_valid", "valid_ratio"))
+  segments[]
+}
+
+compute_dynamic_gaze_aoi_hits <- function(aoi, gaze, sample_period_ms = NULL) {
+  .daoi_need_pkg("data.table")
+  boxes <- data.table::copy(data.table::as.data.table(aoi))
+  points <- data.table::copy(data.table::as.data.table(gaze))
+  if (nrow(boxes) == 0 || nrow(points) == 0) return(list(hits = data.table::data.table(), summary = data.table::data.table()))
+  points <- points[valid_gaze == TRUE & is.finite(video_time_ms) & is.finite(gaze_x) & is.finite(gaze_y)]
+  boxes <- boxes[valid_aoi == TRUE & is.finite(start_ms) & is.finite(end_ms) & end_ms > start_ms]
+  if (nrow(boxes) == 0 || nrow(points) == 0) return(list(hits = data.table::data.table(), summary = data.table::data.table()))
+  if (is.null(sample_period_ms) || !is.finite(sample_period_ms)) {
+    sample_period_ms <- suppressWarnings(stats::median(diff(sort(unique(points$video_time_ms))), na.rm = TRUE))
+  }
+  if (!is.finite(sample_period_ms) || sample_period_ms <= 0) sample_period_ms <- 1
+  points[, `:=`(.gaze_start = video_time_ms, .gaze_end = video_time_ms)]
+  boxes[, `:=`(.aoi_start = start_ms, .aoi_end = end_ms)]
+  data.table::setkey(boxes, .aoi_start, .aoi_end)
+  overlaps <- data.table::foverlaps(points, boxes, by.x = c(".gaze_start", ".gaze_end"), by.y = c(".aoi_start", ".aoi_end"), type = "within", nomatch = 0L)
+  overlaps[, hit := gaze_x >= x_min & gaze_x <= x_max & gaze_y >= y_min & gaze_y <= y_max]
+  keep <- intersect(c("video_time_ms", "gaze_x", "gaze_y", "pupil", "participant", "trial_id", "experiment_code", "condition", "aoi_scope", "aoi_group_id", "hit"), names(overlaps))
+  hits <- overlaps[, ..keep]
+  keys <- intersect(c("participant", "trial_id", "experiment_code", "condition", "aoi_scope", "aoi_group_id"), names(hits))
+  summary <- hits[, .(
+    dwell_time_sample_ms = sum(hit, na.rm = TRUE) * sample_period_ms,
+    aoi_sample_count = sum(hit, na.rm = TRUE),
+    aoi_sample_proportion = mean(hit, na.rm = TRUE),
+    first_hit_time_ms = if (any(hit)) min(video_time_ms[hit], na.rm = TRUE) else NA_real_,
+    ttff_ms = if (any(hit)) min(video_time_ms[hit], na.rm = TRUE) - min(video_time_ms, na.rm = TRUE) else NA_real_,
+    mean_pupil_in_aoi = if (any(hit)) mean(pupil[hit], na.rm = TRUE) else NA_real_
+  ), by = keys]
+  list(hits = hits[], summary = summary[])
 }
 
 select_aoi_at_time <- function(aoi, time_ms, max_nearest_gap_ms = 120, valid_only = FALSE) {
@@ -234,9 +309,8 @@ select_aoi_at_time <- function(aoi, time_ms, max_nearest_gap_ms = 120, valid_onl
     hit <- cand[is.finite(start_ms) & is.finite(end_ms) & time_ms >= start_ms & time_ms < end_ms]
     if (nrow(hit) > 0) return(hit[])
   }
-  cand[, .dist := abs(time_ms - time_ms)]
-  # The previous line is intentionally overwritten below to avoid NSE ambiguity.
-  cand[, .dist := abs(get("time_ms") - time_ms)]
+  target_time_ms <- time_ms
+  cand[, .dist := abs(get("time_ms") - target_time_ms)]
   hit <- cand[is.finite(.dist) & .dist <= max_nearest_gap_ms]
   hit[, .dist := NULL]
   hit[]
@@ -344,6 +418,23 @@ plot_dynamic_aoi_frame <- function(frame_file, aoi_rows = NULL, gaze_rows = NULL
   out
 }
 
+.daoi_auto_gaze_offset <- function(gaze, current_offset = 0, force = FALSE) {
+  gaze <- .daoi_table(gaze)
+  times <- gaze$time_ms[is.finite(gaze$time_ms)]
+  if (!length(times)) return(as.numeric(current_offset %||% 0))
+  first_time <- min(times)
+  if (isTRUE(force) || first_time > 1e6) first_time else as.numeric(current_offset %||% 0)
+}
+
+.daoi_prepare_video <- function(source, target, ffmpeg_path = .daoi_default_ffmpeg()) {
+  copied <- file.copy(source, target, overwrite = TRUE)
+  if (!isTRUE(copied) || tolower(tools::file_ext(target)) != "mp4") return(target)
+  fast_target <- file.path(dirname(target), paste0(tools::file_path_sans_ext(basename(target)), "_faststart.mp4"))
+  args <- c("-y", "-i", normalizePath(target, winslash = "/"), "-c", "copy", "-movflags", "+faststart", normalizePath(fast_target, winslash = "/", mustWork = FALSE))
+  try(suppressWarnings(system2(ffmpeg_path, args = args, stdout = FALSE, stderr = FALSE)), silent = TRUE)
+  if (file.exists(fast_target) && file.info(fast_target)$size > 0) fast_target else target
+}
+
 dynamic_aoi_validator_module_ui <- function(id) {
   ns <- shiny::NS(id)
   shiny::fluidRow(
@@ -351,8 +442,14 @@ dynamic_aoi_validator_module_ui <- function(id) {
       shiny::fileInput(ns("video_file"), "上传录屏视频（MP4/MOV/AVI/MKV）", accept = c(".mp4", ".mov", ".avi", ".mkv")),
       shiny::fileInput(ns("aoi_file"), "上传 UE 动态 AOI CSV", accept = c(".csv", ".txt")),
       shiny::fileInput(ns("gaze_file"), "可选：上传眼动 ASC 或 gaze CSV", accept = c(".asc", ".csv", ".txt")),
+      shiny::selectInput(ns("experiment_filter"), "实验", choices = c("All" = ""), selected = ""),
+      shiny::selectInput(ns("condition_filter"), "条件", choices = c("All" = ""), selected = ""),
+      shiny::selectInput(ns("trial_filter"), "Trial", choices = c("All" = ""), selected = ""),
+      shiny::selectInput(ns("scope_filter"), "AOI Scope", choices = c("All" = ""), selected = "", multiple = TRUE),
+      shiny::selectInput(ns("segment_filter"), "加载段", choices = c("All" = ""), selected = ""),
       shiny::selectInput(ns("aoi_time_unit"), "AOI 时间单位", choices = c("毫秒 ms" = "ms", "秒 sec" = "sec"), selected = "ms"),
       shiny::selectInput(ns("gaze_time_unit"), "眼动 CSV 时间单位", choices = c("毫秒 ms" = "ms", "秒 sec" = "sec"), selected = "ms"),
+      shiny::checkboxInput(ns("auto_gaze_offset"), "自动将绝对眼动时间对齐到视频起点", value = TRUE),
       shiny::numericInput(ns("gaze_offset_ms"), "眼动时间偏移 / ms", value = 0, step = 10),
       shiny::numericInput(ns("aoi_video_offset_ms"), "AOI 视频时间偏移 / ms", value = 0, step = 50),
       shiny::helpText("AOI 框比画面慢时填写负值；框比画面快时填写正值。"),
@@ -367,6 +464,10 @@ dynamic_aoi_validator_module_ui <- function(id) {
       shiny::numericInput(ns("gaze_window_ms"), "叠加眼动窗口 ±ms", value = 120, min = 1, step = 10),
       shiny::checkboxInput(ns("valid_only"), "只显示有效 AOI", value = TRUE),
       shiny::actionButton(ns("run_check"), "读取并开始动态验证", class = "btn-primary"),
+      shiny::downloadButton(ns("download_segments"), "下载加载段"),
+      shiny::downloadButton(ns("download_quality"), "下载 AOI 质量"),
+      shiny::downloadButton(ns("download_hits"), "下载 gaze × AOI 明细"),
+      shiny::downloadButton(ns("download_hit_summary"), "下载 gaze × AOI 汇总"),
       shiny::verbatimTextOutput(ns("status"))
     ),
     shiny::column(8,
@@ -379,12 +480,14 @@ dynamic_aoi_validator_module_ui <- function(id) {
   )
 }
 
-dynamic_aoi_validator_module_server <- function(id) {
+dynamic_aoi_validator_module_server <- function(id, package_reactive = NULL) {
   shiny::moduleServer(id, function(input, output, session) {
     ns <- session$ns
     aoi_raw_rv <- shiny::reactiveVal(data.table::data.table())
     aoi_rv <- shiny::reactiveVal(data.table::data.table())
+    gaze_raw_rv <- shiny::reactiveVal(data.table::data.table())
     gaze_rv <- shiny::reactiveVal(data.table::data.table())
+    segments_rv <- shiny::reactiveVal(data.table::data.table())
     quality_rv <- shiny::reactiveVal(list(summary = data.table::data.table(), invalid_rows = data.table::data.table(), gaps = data.table::data.table()))
     video_url_rv <- shiny::reactiveVal(NULL)
     video_dir <- file.path(tempdir(), paste0("dynamic_aoi_video_", as.integer(stats::runif(1, 1, 1e9))))
@@ -392,17 +495,48 @@ dynamic_aoi_validator_module_server <- function(id) {
     video_prefix <- paste0("dynamic-aoi-video-", as.integer(stats::runif(1, 1, 1e9)))
     shiny::addResourcePath(video_prefix, video_dir)
 
+    filtered_aoi <- shiny::reactive({
+      out <- .daoi_table(aoi_rv())
+      if (!nrow(out)) return(out)
+      if (nzchar(input$experiment_filter %||% "")) out <- out[experiment_code == input$experiment_filter]
+      if (nzchar(input$condition_filter %||% "")) out <- out[condition == input$condition_filter]
+      if (nzchar(input$trial_filter %||% "")) out <- out[trial_id == input$trial_filter]
+      scopes <- input$scope_filter %||% ""
+      scopes <- scopes[nzchar(scopes)]
+      if (length(scopes) > 0) out <- out[aoi_scope %in% scopes]
+      if (nzchar(input$segment_filter %||% "")) {
+        seg <- .daoi_table(segments_rv())
+        if (nrow(seg) > 0 && "segment_id" %in% names(seg)) seg <- seg[segment_id == input$segment_filter]
+        if (nrow(seg) > 0) out <- out[
+          participant == seg$participant[[1]] & trial_id == seg$trial_id[[1]] &
+          experiment_code == seg$experiment_code[[1]] & condition == seg$condition[[1]] & phase == seg$phase[[1]]
+        ]
+      }
+      out[]
+    })
+
+    gaze_hits <- shiny::reactive(compute_dynamic_gaze_aoi_hits(filtered_aoi(), gaze_rv()))
+
     rebuild_aoi <- function() {
-      raw <- aoi_raw_rv()
-      if (nrow(raw) == 0) return(invisible(NULL))
+      raw <- .daoi_table(aoi_raw_rv())
+      if (!nrow(raw)) return(invisible(NULL))
       adjusted <- .daoi_apply_aoi_offset(raw, input$aoi_video_offset_ms)
-      aoi_rv(adjusted)
-      quality_rv(validate_dynamic_aoi(adjusted, screen_width = input$screen_width, screen_height = input$screen_height))
-      invisible(adjusted)
+      quality <- validate_dynamic_aoi(adjusted, screen_width = input$screen_width, screen_height = input$screen_height)
+      rows <- .daoi_table(quality$rows %||% adjusted)
+      aoi_rv(rows)
+      quality_rv(quality)
+      invisible(rows)
+    }
+
+    rebuild_gaze <- function() {
+      gaze <- .daoi_table(gaze_raw_rv())
+      if (nrow(gaze) > 0) data.table::set(gaze, j = "video_time_ms", value = gaze$time_ms - (input$gaze_offset_ms %||% 0))
+      gaze_rv(gaze)
+      invisible(gaze)
     }
 
     write_player_rows <- function(dt, file_name, columns) {
-      out <- data.table::copy(data.table::as.data.table(dt))
+      out <- .daoi_table(dt)
       keep <- intersect(columns, names(out))
       out <- out[, ..keep]
       target <- file.path(video_dir, file_name)
@@ -417,9 +551,9 @@ dynamic_aoi_validator_module_server <- function(id) {
         gaze <- data.table::copy(gaze_rv())
         if (nrow(gaze) > 100000) gaze <- gaze[unique(round(seq(1, .N, length.out = 100000)))]
         aoi_url <- write_player_rows(
-          aoi_rv(),
+          filtered_aoi(),
           "dynamic-aoi.ndjson",
-          c("aoi_group_id", "aoi_name", "shape_id", "time_ms", "start_ms", "end_ms", "x_min", "y_min", "x_max", "y_max", "valid_aoi")
+          c("experiment_code", "condition", "trial_id", "aoi_scope", "aoi_group_id", "aoi_name", "shape_id", "time_ms", "start_ms", "end_ms", "x_min", "y_min", "x_max", "y_max", "valid_aoi")
         )
         gaze_url <- write_player_rows(
           gaze,
@@ -439,6 +573,9 @@ dynamic_aoi_validator_module_server <- function(id) {
           aoiOffsetY = input$aoi_offset_y %||% 0,
           aoiScaleX = input$aoi_scale_x %||% 100,
           aoiScaleY = input$aoi_scale_y %||% 100,
+          seekId = ns("seek"),
+          backId = ns("back"),
+          forwardId = ns("forward"),
           nearestMs = input$nearest_aoi_ms %||% 120,
           gazeWindowMs = input$gaze_window_ms %||% 120,
           validOnly = isTRUE(input$valid_only)
@@ -451,8 +588,13 @@ dynamic_aoi_validator_module_server <- function(id) {
       if (is.null(video_url)) return(shiny::helpText("上传录屏视频与动态 AOI CSV 后，视频会在这里连续播放并实时绘制 AOI。"))
       shiny::tagList(
         shiny::tags$div(style = "position:relative; width:100%; background:#111; line-height:0;",
-          shiny::tags$video(id = ns("video"), src = video_url, controls = NA, preload = "metadata", style = "display:block; width:100%; height:auto; max-height:72vh;"),
+          shiny::tags$video(id = ns("video"), src = video_url, controls = NA, preload = "auto", style = "display:block; width:100%; height:auto; max-height:72vh;"),
           shiny::tags$canvas(id = ns("canvas"), style = "position:absolute; inset:0; width:100%; height:100%; pointer-events:none;")
+        ),
+        shiny::tags$div(class = "dynamic-aoi-seek-controls",
+          shiny::tags$button(id = ns("back"), type = "button", class = "btn btn-default", title = "后退 5 秒", "\u23ea"),
+          shiny::tags$input(id = ns("seek"), type = "range", min = "0", max = "1", step = "0.01", value = "0"),
+          shiny::tags$button(id = ns("forward"), type = "button", class = "btn btn-default", title = "前进 5 秒", "\u23e9")
         ),
         shiny::tags$p(shiny::tags$b("当前视频时间："), shiny::tags$span(id = ns("time"), "0 ms"))
       )
@@ -463,42 +605,118 @@ dynamic_aoi_validator_module_server <- function(id) {
       aoi <- read_dynamic_aoi_csv(input$aoi_file$datapath, time_unit = input$aoi_time_unit, source_file = input$aoi_file$name)
       aoi_raw_rv(aoi)
       rebuild_aoi()
+      segments <- build_dynamic_aoi_segments(aoi)
+      segments_rv(segments)
+      shiny::updateSelectInput(session, "experiment_filter", choices = c("All" = "", sort(unique(aoi$experiment_code[nzchar(aoi$experiment_code)]))))
+      shiny::updateSelectInput(session, "condition_filter", choices = c("All" = "", sort(unique(aoi$condition[nzchar(aoi$condition)]))))
+      shiny::updateSelectInput(session, "trial_filter", choices = c("All" = "", sort(unique(aoi$trial_id[nzchar(aoi$trial_id)]))))
+      shiny::updateSelectInput(session, "scope_filter", choices = c("All" = "", sort(unique(aoi$aoi_scope[nzchar(aoi$aoi_scope)]))))
+      segment_choices <- if (nrow(segments) > 0) stats::setNames(segments$segment_id, segments$segment_label) else character()
+      shiny::updateSelectInput(session, "segment_filter", choices = c("All" = "", segment_choices))
       if (!is.null(input$gaze_file)) {
         gaze <- read_gaze_table(input$gaze_file$datapath, time_unit = input$gaze_time_unit, source_file = input$gaze_file$name)
-        if (nrow(gaze) > 0) gaze[, video_time_ms := time_ms - input$gaze_offset_ms]
-        gaze_rv(gaze)
+        gaze_raw_rv(gaze)
+        if (isTRUE(input$auto_gaze_offset)) {
+          auto_offset <- .daoi_auto_gaze_offset(gaze, input$gaze_offset_ms, force = tolower(tools::file_ext(input$gaze_file$name)) == "asc")
+          shiny::updateNumericInput(session, "gaze_offset_ms", value = auto_offset)
+          if (nrow(gaze) > 0) data.table::set(gaze, j = "video_time_ms", value = gaze$time_ms - auto_offset)
+          gaze_rv(gaze)
+          session$sendCustomMessage("dynamic-aoi-player-notice", list(id = ns("player"), text = sprintf("眼动时间已自动对齐：减去 %.0f ms", auto_offset)))
+        } else {
+          rebuild_gaze()
+        }
       } else {
+        gaze_raw_rv(data.table::data.table())
         gaze_rv(data.table::data.table())
       }
       ext <- tools::file_ext(input$video_file$name)
       target <- file.path(video_dir, paste0("video", if (nzchar(ext)) paste0(".", ext) else ""))
-      file.copy(input$video_file$datapath, target, overwrite = TRUE)
-      video_url_rv(paste0("/", video_prefix, "/", utils::URLencode(basename(target), reserved = TRUE)))
+      prepared <- .daoi_prepare_video(input$video_file$datapath, target)
+      video_url_rv(paste0("/", video_prefix, "/", utils::URLencode(basename(prepared), reserved = TRUE)))
       later::later(send_player_data, delay = 0.3)
       shiny::showNotification("动态 AOI 视频验证已加载。", type = "message")
     })
 
+    if (!is.null(package_reactive)) shiny::observeEvent(package_reactive(), {
+      pkg <- package_reactive()
+      if (is.null(pkg) || is.null(pkg$dynamic_aoi) || nrow(pkg$dynamic_aoi) == 0) return()
+      aoi <- standardize_dynamic_aoi(pkg$dynamic_aoi, time_unit = "ms", source_file = "formal_package_dynamic_aoi.csv")
+      aoi_raw_rv(aoi)
+      rebuild_aoi()
+      segments <- build_dynamic_aoi_segments(aoi)
+      segments_rv(segments)
+      shiny::updateSelectInput(session, "experiment_filter", choices = c("All" = "", sort(unique(aoi$experiment_code[nzchar(aoi$experiment_code)]))))
+      shiny::updateSelectInput(session, "condition_filter", choices = c("All" = "", sort(unique(aoi$condition[nzchar(aoi$condition)]))))
+      shiny::updateSelectInput(session, "trial_filter", choices = c("All" = "", sort(unique(aoi$trial_id[nzchar(aoi$trial_id)]))))
+      shiny::updateSelectInput(session, "scope_filter", choices = c("All" = "", sort(unique(aoi$aoi_scope[nzchar(aoi$aoi_scope)]))))
+      segment_choices <- if (nrow(segments) > 0) stats::setNames(segments$segment_id, segments$segment_label) else character()
+      shiny::updateSelectInput(session, "segment_filter", choices = c("All" = "", segment_choices))
+      gaze <- .daoi_table(pkg$parsed$samples)
+      if (nrow(gaze) > 0) {
+        data.table::setnames(gaze, intersect(c("time", "gaze_x", "gaze_y", "pupil", "valid_gaze"), names(gaze)),
+          intersect(c("time_ms", "gaze_x", "gaze_y", "pupil", "valid_gaze"), c("time_ms", "gaze_x", "gaze_y", "pupil", "valid_gaze")))
+        gaze <- gaze[, .(time_ms, gaze_x, gaze_y, pupil, valid_gaze)]
+        gaze_raw_rv(gaze)
+        auto_offset <- .daoi_auto_gaze_offset(gaze, 0, force = TRUE)
+        shiny::updateNumericInput(session, "gaze_offset_ms", value = auto_offset)
+        gaze[, video_time_ms := time_ms - auto_offset]
+        gaze_rv(gaze)
+      }
+      video_rows <- pkg$inventory[type == "screen_recording"]
+      if (nrow(video_rows) > 0) {
+        source <- file.path(pkg$root, video_rows$relative_path[[1]])
+        ext <- tools::file_ext(source)
+        target <- file.path(video_dir, paste0("formal_package_video", if (nzchar(ext)) paste0(".", ext) else ""))
+        prepared <- .daoi_prepare_video(source, target)
+        video_url_rv(paste0("/", video_prefix, "/", utils::URLencode(basename(prepared), reserved = TRUE)))
+      }
+      later::later(send_player_data, delay = 0.3)
+      shiny::showNotification("正式数据包已自动载入动态 AOI 验证页。", type = "message")
+    }, ignoreInit = TRUE)
+
     shiny::observeEvent(input$aoi_video_offset_ms, {
-      if (nrow(aoi_raw_rv()) > 0) {
+      if (nrow(.daoi_table(aoi_raw_rv())) > 0) {
         rebuild_aoi()
         send_player_data()
+      }
+    }, ignoreInit = TRUE)
+
+    shiny::observeEvent(input$gaze_offset_ms, {
+      if (nrow(.daoi_table(gaze_raw_rv())) > 0) {
+        rebuild_gaze()
+        send_player_data()
+      }
+    }, ignoreInit = TRUE)
+
+    shiny::observeEvent(input$segment_filter, {
+      seg <- .daoi_table(segments_rv())
+      if (nrow(seg) > 0 && "segment_id" %in% names(seg)) seg <- seg[segment_id == input$segment_filter]
+      if (nrow(seg) > 0 && is.finite(seg$start_ms[[1]])) {
+        session$sendCustomMessage("dynamic-aoi-player-seek", list(id = ns("player"), timeMs = seg$start_ms[[1]] + (input$aoi_video_offset_ms %||% 0)))
       }
     }, ignoreInit = TRUE)
 
     shiny::observeEvent(list(
       input$screen_width, input$screen_height,
       input$aoi_offset_x, input$aoi_offset_y, input$aoi_scale_x, input$aoi_scale_y,
-      input$nearest_aoi_ms, input$gaze_window_ms, input$valid_only
+      input$nearest_aoi_ms, input$gaze_window_ms, input$valid_only,
+      input$experiment_filter, input$condition_filter, input$trial_filter, input$scope_filter, input$segment_filter
     ), {
-      if (nrow(aoi_raw_rv()) > 0) rebuild_aoi()
-      if (nrow(aoi_rv()) > 0) send_player_data()
+      if (nrow(.daoi_table(aoi_raw_rv())) > 0) rebuild_aoi()
+      if (nrow(.daoi_table(aoi_rv())) > 0) send_player_data()
     }, ignoreInit = TRUE)
 
     output$status <- shiny::renderPrint({
-      cat("AOI rows:", nrow(aoi_rv()), "\n")
+      cat("AOI rows:", nrow(.daoi_table(aoi_rv())), "\n")
+      cat("Displayed AOI rows:", nrow(filtered_aoi()), "\n")
+      cat("Dynamic loading segments:", nrow(.daoi_table(segments_rv())), "\n")
       cat("AOI video offset ms:", input$aoi_video_offset_ms %||% 0, "\n")
       cat("AOI spatial adjustment:", sprintf("x=%s px, y=%s px, scale=%s%% x %s%%", input$aoi_offset_x %||% 0, input$aoi_offset_y %||% 0, input$aoi_scale_x %||% 100, input$aoi_scale_y %||% 100), "\n")
-      cat("Gaze rows:", nrow(gaze_rv()), "\n")
+      cat("Gaze rows:", nrow(.daoi_table(gaze_rv())), "\n")
+      gaze <- .daoi_table(gaze_rv())
+      if (nrow(gaze) > 0 && "video_time_ms" %in% names(gaze)) cat("Gaze video-time range ms:", paste(round(range(gaze$video_time_ms, na.rm = TRUE)), collapse = " to "), "\n")
+      aoi <- filtered_aoi()
+      if (nrow(aoi) > 0) cat("AOI video-time range ms:", paste(round(range(aoi$time_ms, na.rm = TRUE)), collapse = " to "), "\n")
       cat("Video loaded:", !is.null(video_url_rv()), "\n")
     })
     output$quality_tbl <- DT::renderDT(DT::datatable(quality_rv()$summary, filter = "top", rownames = FALSE, options = list(scrollX = TRUE, pageLength = 6)))
@@ -507,6 +725,22 @@ dynamic_aoi_validator_module_server <- function(id) {
       if (nrow(invalid) > 5000) invalid <- head(invalid, 5000)
       DT::datatable(invalid, filter = "top", rownames = FALSE, options = list(scrollX = TRUE, pageLength = 6))
     })
+    output$download_segments <- shiny::downloadHandler(
+      filename = function() "dynamic_aoi_segments.csv",
+      content = function(file) data.table::fwrite(segments_rv(), file)
+    )
+    output$download_quality <- shiny::downloadHandler(
+      filename = function() "dynamic_aoi_quality.csv",
+      content = function(file) data.table::fwrite(quality_rv()$summary, file)
+    )
+    output$download_hits <- shiny::downloadHandler(
+      filename = function() "dynamic_gaze_aoi_hits.csv",
+      content = function(file) data.table::fwrite(gaze_hits()$hits, file)
+    )
+    output$download_hit_summary <- shiny::downloadHandler(
+      filename = function() "dynamic_gaze_aoi_summary.csv",
+      content = function(file) data.table::fwrite(gaze_hits()$summary, file)
+    )
   })
 }
 
@@ -518,7 +752,7 @@ dynamic_aoi_validator_app <- function() {
   .daoi_need_pkg("ggplot2")
 
   ui <- shiny::fluidPage(
-    shiny::tags$head(shiny::tags$script(src = "dynamic-aoi-player.js?v=20260606-spatial-calibration")),
+    shiny::tags$head(shiny::tags$script(src = "dynamic-aoi-player.js?v=20260610-blob-seek")),
     shiny::titlePanel("动态 AOI 录屏验证 / Dynamic AOI Video Validator"),
     shiny::sidebarLayout(
       shiny::sidebarPanel(
