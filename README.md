@@ -1,248 +1,172 @@
-# EyeLink ASC Analyzer CN
+# EyeLink ASC Analyzer
 
-面向 **EyeLink ASC / EyeLink 1000+** 数据的 R Shiny 眼动分析工具。项目目标是替代 DataViewer 的主要指标导出流程，并针对 UE / 三维加载体验 HCI 实验提供更贴合实验流程的 trial、phase、AOI、瞳孔与行为数据综合分析能力。
+面向 EyeLink 眼动实验的本地分析工具，基于 R Shiny 构建。项目用于解析 EyeLink ASC 数据，按实验、试次与阶段计算眼动指标，并整合 AOI、行为记录和录屏验证结果，生成可用于统计分析的报表。
 
-## CodeX / Codex 接手说明
+当前版本主要适配 EyeLink 1000+ 与 UE 三维交互实验，同时保留通用 ASC 上传与分析流程。
 
-请先阅读仓库根目录下的：
+## 主要功能
 
-```text
-PROJECT_PLAN.md
-```
+- 解析 ASC 中的 sample、fixation、saccade、blink、message、trial 与实验变量。
+- 自动识别 EXP1 / EXP2 及 loading、viewer、question、selection 等实验阶段。
+- 生成 trial、phase、fixation、saccade、blink、pupil 和数据质量报表。
+- 合并 EXP1 答题记录与 EXP2 选择事件，检查时间戳和 marker 对齐情况。
+- 支持矩形、圆形、组合 AOI，以及 UE 导出的动态 AOI。
+- 在录屏中实时叠加动态 AOI 与 gaze，支持时间、位置和缩放校准。
+- 对照 DataViewer 导出结果检查关键指标。
+- 导出 CSV、XLSX 与 PNG，提供统计建模所需长表。
 
-该文件记录了项目定位、版本规划、当前代码状态、已实现功能、已知限制、下一步开发任务和验收标准。后续开发请优先按照 `PROJECT_PLAN.md` 的任务顺序推进。
+## 运行环境
 
-当前参考 ASC 文件已经由用户手动上传到：
+- Windows
+- R 4.5.3 或兼容版本
+- SR Research EDF2ASC，用于将 EDF 转换为 ASC
+- ffmpeg，可选，用于动态 AOI 录屏验证与视频预处理
 
-```text
-data/demo/FM164641.asc
-```
-
-解析该文件时，可用以下期望计数作为回归测试参照：
-
-```text
-data/demo/FM164641_expected_counts.csv
-```
-
-期望值：
-
-| 项目 | 数量 / 状态 |
-|---|---:|
-| samples | 94,009 |
-| fixations | 126 |
-| saccades | 125 |
-| blinks | 17 |
-| messages | 91 |
-| trials | 2 |
-| sampling_rate | 2000 Hz |
-| eye | RIGHT |
-| display_coords | 0,0,1919,1079 |
-
-## 当前代码状态
-
-当前提交已经包含一个可继续开发的 R Shiny 原型：
-
-| 模块 | 当前状态 |
-|---|---|
-| ASC 解析 | 已写入 `R/core.R` |
-| Sample / EFIX / ESACC / EBLINK 解析 | 已写入 |
-| MSG / TRIALID / TRIAL_VAR 解析 | 已写入 |
-| Trial / Phase 自动识别 | 已写入 |
-| Loading / Viewer / Question / Progressive Usable 阶段 | 已写入 |
-| Trial / Phase / Fixation / Saccade / Blink / Pupil 报表 | 已写入 |
-| 中文指标字典 | 已写入 |
-| Shiny 可视化界面 | 已写入 `app.R` |
-| 矩形 / 圆形 / 组合 AOI | 已写入基础逻辑 |
-| AOI Report | 已写入基础逻辑 |
-| 答题 CSV 合并与时间戳检查 | 已写入基础逻辑 |
-| XLSX 导出 | 已写入基础逻辑 |
-| 热图 / 轨迹 / 时间线基础图 | 已写入 |
-| 动态 AOI 视频验证 | 已集成到主菜单，支持实时 AOI / gaze 叠加 |
-| 动态 AOI 时间与空间校准 | 支持时间偏移、X/Y 位移和横纵缩放 |
-
-当前版本已在 Windows + R 4.5.3 环境完成本地运行与回归测试。
-
-## 安装依赖
-
-在 R 或 RStudio 中运行：
+安装 R 依赖：
 
 ```r
 source("install_dependencies.R")
 ```
 
-## 启动软件
+启动应用：
 
 ```r
-shiny::runApp()
+source("run_local.R")
 ```
 
-或显式指定项目目录：
+应用默认运行于：
+
+```text
+http://127.0.0.1:3838
+```
+
+也可以在 R 或 RStudio 中直接运行：
 
 ```r
 shiny::runApp(".")
 ```
 
-## 推荐本地验证流程
+## 推荐工作流
 
-CodeX / Codex 接手后建议先按以下顺序验证：
+1. 将 EDF 转换为 ASC，或准备完整的正式参与者数据包。
+2. 在 Shiny 中上传 ASC，或填写正式参与者目录路径并加载。
+3. 检查数据概览、质量报告、trial 和 phase 识别结果。
+4. 按实验、条件、trial 与 phase 筛选并查看指标。
+5. 根据需要进行静态 AOI、动态 AOI、行为数据或 DataViewer 对齐分析。
+6. 在导出页面下载分析表、图像或完整 XLSX 报告。
 
-```r
-source("install_dependencies.R")
-source("R/core.R", encoding = "UTF-8")
-parsed <- parse_asc("data/demo/FM164641.asc")
-reports <- compute_reports(parsed)
+正式参与者数据包建议采用以下结构：
 
-nrow(parsed$samples)
-nrow(parsed$fixations)
-nrow(parsed$saccades)
-nrow(parsed$blinks)
-nrow(parsed$messages)
-nrow(parsed$trials)
+```text
+Participant/
+├─ DataCollectionManifest.csv
+├─ AOI/
+│  └─ *_DynamicAOI.csv
+├─ CSV/
+│  ├─ *_exp01_InspectQuestionResults.csv
+│  ├─ *_exp02_Experiment2Results.csv
+│  └─ *_ExperimentEndEvent.csv
+├─ EDF/
+│  ├─ *.EDF
+│  └─ *.asc
+├─ Logs/
+│  ├─ EyeLinkMarkers_*.log
+│  └─ ScreenRecordingLog.csv
+└─ ScreenRecordings/
+   └─ *.mkv
 ```
 
-然后与 `data/demo/FM164641_expected_counts.csv` 对比。
+部分补采或中断实验可能只包含其中一部分文件。应用会读取可用内容，并在数据概览中显示包清单与警告。
 
-## DataViewer 对齐检查
+## 输入数据
 
-本项目现在提供 DataViewer 4.2.1 对齐检查入口，用于把自编 R 报表与 DataViewer 导出的 Trial Report、Message Report、Fixation Report、Saccade Report 和 Time Course Report 做并排比较。
+### EyeLink ASC
 
-在 R 中运行：
+ASC 是核心分析输入。正式使用前需通过 SR Research EDF2ASC 将 EDF 转换为 ASC。
+
+仓库提供两个回归测试样例：
+
+- `data/demo/FM164641.asc`：基础解析样例。
+- `data/demo/V2/610FullTrialTest/`：包含 EXP1、EXP2、动态 AOI 与录屏的完整参与者包。
+
+### 静态 AOI
+
+模板位于 `data/templates/aoi_template.csv`。支持矩形、圆形及由多个 shape 组成的组合 AOI，可按 trial、condition、phase 和时间范围绑定。
+
+### 动态 AOI
+
+动态 AOI CSV 通常由 UE 导出屏幕空间 bounding box。动态 AOI 验证页面可将其与录屏和 gaze 叠加，并校准：
+
+- 视频时间偏移
+- 水平与垂直位置偏移
+- 横向与纵向缩放
+
+正式录制时，建议保持 UE Viewport、录屏和 EyeLink `DISPLAY_COORDS` 分辨率一致。
+
+### 行为记录
+
+通用行为表模板位于 `data/templates/behavior_template.csv`。正式数据包中的 EXP1 与 EXP2 行为 CSV 会被自动识别并用于对齐和综合分析。
+
+## 主要输出
+
+| 输出 | 内容 |
+|---|---|
+| `quality_report` | 有效率、缺失率、事件数量与 validation 信息 |
+| `trial_report` | 每个 trial 的眼动与瞳孔汇总指标 |
+| `phase_report` | 每个实验阶段的汇总指标 |
+| `phase_analysis_long` | 面向后续统计建模的正式分析长表 |
+| `fixation_report` | fixation 起止时间、持续时间、坐标、瞳孔与阶段归属 |
+| `saccade_report` | saccade 起止点、幅度、峰值速度与方向 |
+| `blink_report` | blink 起止时间与持续时间 |
+| `pupil_timeseries` | 分箱后的瞳孔时间序列 |
+| `aoi_report` | dwell、TTFF、FFD、visit count 与 sample proportion |
+| `behavior_check_report` | ASC marker 与行为记录的时间戳检查 |
+| `merged_eye_behavior_report` | 眼动指标与行为表现综合表 |
+| `metric_dictionary` | 指标定义、公式与适用性说明 |
+
+## 分析规则
+
+- Fixation、saccade 与 blink 按半开区间 `[start, end)` 与 trial / phase 区间重叠关系归属。
+- 跨越 trial 或 phase 边界的事件会被裁剪；原始事件仍保留在 `*_report_raw`。
+- Pupil 指标默认要求 pupil 有限且大于 0，并可同时要求 gaze 有效。
+- 2000 Hz ASC 可能在同一毫秒包含两行 sample；程序通过 `sample_index` 保留全部记录。
+- 动态 AOI 正式分析使用 EyeLink、UE 与 Unix 时间基准对齐；视频预览校准不会改变正式报表。
+
+## 验证与测试
+
+运行完整回归测试：
 
 ```r
-source("R/core.R", encoding = "UTF-8")
-parsed <- parse_asc("data/demo/FM164641.asc")
-reports <- compute_reports(parsed)
-
-compare_with_dataviewer(
-  parsed = parsed,
-  reports = reports,
-  dv_trial_file = "data/dv_exports/trialreport_FM121120.xls",
-  dv_message_file = "data/dv_exports/mesreport_FM121120.xls",
-  dv_fixation_file = "data/dv_exports/fixreport.xls",
-  dv_saccade_file = "data/dv_exports/sacreport_FM121120.xls",
-  dv_timecourse_file = "data/dv_exports/timecourseReport_FM121120.xls",
-  out_file = "outputs/dv_alignment_report.xlsx"
-)
-```
-
-在 Shiny 中，先上传并解析 ASC，再进入 **DataViewer 对齐检查** 页，分别上传 DataViewer 的五类 report，点击“运行对齐检查”，然后下载 `dv_alignment_report.xlsx`。
-
-## 关键对齐规则
-
-- Fixation / Saccade / Blink 现在按半开区间重叠 `[start, end)` 归入 trial / phase，而不是只看事件起点。
-- 跨越 trial 或 phase 边界的事件会被裁剪，并输出 `*_interval_report`。
-- `fixation_report_raw` / `saccade_report_raw` / `blink_report_raw` 保留 EyeLink 原始事件。
-- Pupil 指标默认使用 `valid_sample = valid_gaze & valid_pupil`，其中 pupil 必须有限且大于 0。
-- Time Course 支持 DataViewer Full Trial Period 对齐模式：`pupil_timeseries(parsed, bin_ms = 20, interval_mode = "full_trial", align_to = "trial_start")`。
-
-## 正式分析长表
-
-`compute_reports(parsed)` 会生成 `phase_analysis_long`，默认保留 `phase == "loading"` 的正式加载分析窗口，包含 trial、condition、duration_level、fixation、saccade、blink 和 pupil 指标，可直接用于后续统计建模。
-
-## 测试脚本
-
-```r
-source("scripts/check_demo_alignment.R")
 testthat::test_dir("tests/testthat")
 ```
 
-通过核心解析后，再运行：
+运行基础 demo 与 DataViewer 对齐检查：
 
 ```r
-shiny::runApp()
+source("scripts/check_demo_alignment.R")
 ```
 
-## 动态 AOI 视频验证
-
-主菜单中的 **动态 AOI 验证** 页面支持上传录屏视频、UE 动态 AOI CSV，以及可选的 EyeLink ASC / gaze CSV。视频播放时会实时叠加 AOI 框和眼动点。
-
-可用校准项：
-
-- `AOI 视频时间偏移 / ms`：AOI 比画面慢时填写负值，比画面快时填写正值。
-- `AOI 整体水平偏移 / px` 与 `AOI 整体垂直偏移 / px`：修正录屏窗口边框、标题栏等造成的坐标原点差异。
-- `AOI 横向缩放 / %` 与 `AOI 纵向缩放 / %`：以画面中心为基准修正坐标比例。
-- `叠加眼动窗口 ±ms`：仅控制当前视频时间附近显示的眼动点范围，不会移动 AOI。
-- ASC 的绝对 EyeLink 时间默认自动映射到视频起点；状态区会显示 gaze 与 AOI 的视频时间范围，便于继续手动校准。
-- 视频下方提供独立进度滑杆和前后 5 秒跳转按钮；MP4 上传后会尝试转换为 faststart 版本以提高定位可靠性。
-
-UE 动态 AOI 坐标通常以游戏 Viewport 左上角为原点。正式录制建议使用 Standalone 全屏，并保持 UE Viewport、录屏和 EyeLink `DISPLAY_COORDS` 分辨率一致。
-
-统一动态 AOI CSV 支持按实验、条件、Trial、AOI Scope 和加载段筛选。动态加载段仅识别条件 `B`、`E1`、`E3`；选择加载段后视频会跳转到对应起点。上传 gaze CSV 或 ASC 后，还可导出 gaze × AOI 命中明细与汇总。
-
-## 输入文件
-
-### 1. EyeLink ASC
-
-当前 demo 文件路径：
+基础 demo 的期望计数记录在：
 
 ```text
-data/demo/FM164641.asc
+data/demo/FM164641_expected_counts.csv
 ```
 
-正式使用时，先用 SR Research `EDF2ASC` 将 EDF 转为 ASC，再在界面上传 `.asc` 文件。
+## 已知限制
 
-### 2. AOI CSV
+- 当前不直接读取 EDF，需先转换为 ASC。
+- 多边形 AOI 暂不支持，可使用多个矩形或圆形组合。
+- 项目侧重数据解析、质量检查与指标导出，不以复刻完整 DataViewer 回放功能为目标。
+- ANOVA、LMM、SEM 等统计模型不在应用内执行，建议使用导出的长表完成后续分析。
 
-模板：
+## 开发与维护
 
-```text
-data/templates/aoi_template.csv
-```
+核心解析与报表逻辑位于 `R/core.R`，动态 AOI 逻辑位于 `R/dynamic_aoi_video.R`，Shiny 主界面位于 `app.R`。
 
-支持：
+开发者或自动化编程助手在修改项目前，应先阅读：
 
-- `rectangle`
-- `circle`
-- 多个 shape 共享同一个 `aoi_group_id`，形成组合 AOI
-- 按 `trial_id`、`condition`、`phase`、`time_start`、`time_end` 绑定 AOI
+- [`PROJECT_PLAN.md`](PROJECT_PLAN.md)：项目设计背景、实验约定与后续规划。
+- [`data/demo/README.md`](data/demo/README.md)：测试数据与正式 V2 数据包说明。
+- [`PUSH_LOG.md`](PUSH_LOG.md)：历史实现与验证记录。
 
-### 3. 答题记录 CSV
-
-模板：
-
-```text
-data/templates/behavior_template.csv
-```
-
-推荐字段：
-
-```text
-participant,trial_id,condition,question_id,question_start_unix,question_submit_unix,response_time_ms,selected_answer,correct_answer,accuracy
-```
-
-## 主要导出表
-
-| 表 | 内容 |
-|---|---|
-| `metadata` | 文件、采样率、眼别、屏幕坐标、校准信息 |
-| `quality_report` | 有效率、缺失率、事件数量、validation 信息 |
-| `trial_report` | 每个 trial 的眼动与瞳孔汇总指标 |
-| `phase_report` | loading / viewer / question / progressive usable 分阶段指标 |
-| `fixation_report` | 每个 fixation 的起止时间、持续时间、坐标、瞳孔、trial、phase |
-| `saccade_report` | 每个 saccade 的起止点、幅度、峰值速度、方向 |
-| `blink_report` | 每个 blink 的起止时间和持续时间 |
-| `pupil_timeseries` | 分箱瞳孔曲线 |
-| `aoi_report` | AOI dwell、TTFF、FFD、visit count、sample proportion |
-| `behavior_check_report` | ASC 与答题记录时间戳对齐检查 |
-| `merged_eye_behavior_report` | 眼动指标 + 行为表现综合表 |
-| `metric_dictionary` | 中文指标定义、公式、适用性说明 |
-
-## 当前不包含的功能
-
-| 功能 | 状态 |
-|---|---|
-| 多边形 AOI | 暂不做，用多个矩形 / 圆形组合代替 |
-| 直接读取 EDF | 暂不做，当前优先 ASC |
-| 内置 ANOVA / LMM / SEM | 暂不做，优先导出统计前长表 |
-
-## 注意事项
-
-1. 当前第一目标是指标导出与论文分析表生成，不是完整复制 DataViewer 的回放体验。
-2. 多边形 AOI 暂不做，异形区域建议由多个矩形 / 圆形组合。
-3. 动态 3D AOI 由 UE 导出屏幕空间 bounding box 后，可在动态 AOI 验证页面与录屏进行校准和检查。
-4. 瞳孔字段按 EyeLink `PUPIL AREA` 处理，论文中建议写为 pupil size / pupil area，并进行 baseline correction。
-5. 2000 Hz ASC 可能出现同一毫秒两行 sample，程序保留 `sample_index`，不要按时间戳去重。
-
-## 推送日志
-
-详细变更记录见 [`PUSH_LOG.md`](PUSH_LOG.md)。
+提交修改前应至少运行完整 testthat 测试，并确认 Shiny 应用可以正常启动。
