@@ -1,0 +1,275 @@
+2026-06-13T16:57:33.786+08:00 STATUS start_ui_status sdk=connected host=not_connected log=
+2026-06-13T17:03:08.846+08:00 FORMAL_RECORDING step=EDF_OPEN_REQUESTED success=1 participant=A030 edf=FM170308.EDF source=calibration_button
+2026-06-13T17:03:08.846+08:00 CONNECT method=open_eyelink_connection ip=100.1.1.1
+2026-06-13T17:03:08.881+08:00 CONNECT_RESULT method=open_eyelink_connection result=0 connected=1
+2026-06-13T17:03:08.881+08:00 STATUS host_connected=1 sdk_available=1 note=connection_opened_high_level
+2026-06-13T17:03:08.881+08:00 FORMAL_RECORDING step=HOST_CONNECTED success=1 sdk=1 host=1 source=calibration_button
+2026-06-13T17:03:09.005+08:00 FORMAL_RECORDING step=EDF_OPENED success=1 edf=FM170308.EDF result=0 source=calibration_button
+2026-06-13T17:03:09.050+08:00 FORMAL_EDF_MARKER sdk=1 host=1 opened=1 sent=1 message=FORMAL_EDF_OPENED participant=A030 rel=335.169 unix=1781341389049 bjt=2026-06-13T17:03:09.049+08:00 edf=FM170308.EDF source=ue_formal open_result=0 source_tag=calibration_button
+2026-06-13T17:03:09.050+08:00 FORMAL_EDF_MARKER sdk=1 host=1 opened=1 sent=1 message=FORMAL_SESSION_PREPARED participant=A030 rel=335.169 unix=1781341389050 bjt=2026-06-13T17:03:09.050+08:00 edf=FM170308.EDF source=ue_formal calibration_complete=0
+2026-06-13T17:03:09.050+08:00 FORMAL_EDF_MARKER sdk=1 host=1 opened=1 sent=1 message=CALIBRATION_REQUESTED participant=A030 rel=335.169 unix=1781341389050 bjt=2026-06-13T17:03:09.050+08:00 edf=FM170308.EDF source=ue_formal open_result=0
+2026-06-13T17:03:09.050+08:00 CALIBRATION step=REQUESTED success=1 note=run_eyelink_tracker_setup
+2026-06-13T17:03:09.050+08:00 CALIBRATION step=HOST_CONNECTED success=1 sdk=1 host=1 graphics=1
+2026-06-13T17:03:09.057+08:00 CALIBRATION_DISPLAY_INIT success=1 result=0 error=
+2026-06-13T17:03:09.057+08:00 CALIBRATION_DISPLAY_LIST count=2 requested_index=1 explicit=1
+2026-06-13T17:03:09.057+08:00 CALIBRATION_DISPLAY index=0 name=Dell XPS 15 SDC414D Display bounds_result=0 x=0 y=0 w=1920 h=1080 mode_result=0 mode_w=1920 mode_h=1080 refresh=60
+2026-06-13T17:03:09.057+08:00 CALIBRATION_DISPLAY index=1 name=Acer GR235H bounds_result=0 x=0 y=-1080 w=1920 h=1080 mode_result=0 mode_w=1920 mode_h=1080 refresh=60
+2026-06-13T17:03:09.175+08:00 CALIBRATION step=GRAPHICS_INITIALIZED success=1 result=0 explicit_request=1 display_index=1 window_ptr=000001D094022928 width=1920 height=1080 bits=32 refresh=60.00
+2026-06-13T17:03:09.187+08:00 CALIBRATION step=REGISTERED_WINDOW_MOVED success=1 requested_display=1 actual_display=1 requested_x=0 requested_y=-1080 requested_w=1920 requested_h=1080 actual_x=0 actual_y=-1080 actual_w=1920 actual_h=1080
+2026-06-13T17:03:09.202+08:00 FORMAL_EDF_MARKER sdk=1 host=1 opened=1 sent=1 message=CALIBRATION_SETUP_START participant=A030 rel=335.169 unix=1781341389202 bjt=2026-06-13T17:03:09.202+08:00 edf=FM170308.EDF source=ue_formal calibration_type=HV9 width=1920 height=1080
+2026-06-13T17:03:09.202+08:00 CALIBRATION step=TRACKER_SETUP_BEGIN success=1 detail=call_do_tracker_setup
+2026-06-13T17:03:43.534+08:00 CALIBRATION step=TRACKER_SETUP_RETURNED success=1 result=0
+2026-06-13T17:03:43.535+08:00 FORMAL_EDF_MARKER sdk=1 host=1 opened=1 sent=1 message=CALIBRATION_SETUP_END participant=A030 rel=335.169 unix=1781341423535 bjt=2026-06-13T17:03:43.535+08:00 edf=FM170308.EDF source=ue_formal setup_result=0
+2026-06-13T17:03:45.576+08:00 CALIBRATION step=GRAPHICS_CLOSED success=1
+2026-06-13T17:03:45.576+08:00 CALIBRATION step=CALIBRATION_WINDOW_DESTROYED success=1
+2026-06-13T17:03:45.577+08:00 CALIBRATION step=FINISHED success=1 result=0
+2026-06-13T17:03:45.577+08:00 FORMAL_EDF_MARKER sdk=1 host=1 opened=1 sent=1 message=CALIBRATION_STATUS participant=A030 rel=335.169 unix=1781341425577 bjt=2026-06-13T17:03:45.577+08:00 edf=FM170308.EDF source=ue_formal calibration_complete=1
+2026-06-13T17:03:45.577+08:00 FORMAL_CALIBRATION step=FINISHED success=1 participant=A030 edf=FM170308.EDF open_result=0
+2026-06-13T17:03:45.577+08:00 STATUS start_ui_status sdk=connected host=connected log=../../../../../../Project/UE5/Gallery/Saved/ExperimentLogs/EyeLinkMarkers_20260613_165733_786.log
+2026-06-13T17:04:01.839+08:00 FORMAL_RECORDING step=EDF_ALREADY_OPEN success=1 participant=A030 edf=FM170308.EDF source=start_button_preopened calibration_complete=1
+2026-06-13T17:04:01.848+08:00 FORMAL_RECORDING step=RECORDING_STARTED success=1 result=0 edf=FM170308.EDF preopened=1 calibration_complete=1
+2026-06-13T17:04:01.848+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=FORMAL_RECORDING_START participant=A030 rel=350.967 unix=1781341441848 bjt=2026-06-13T17:04:01.848+08:00 edf=FM170308.EDF source=ue_formal open_result=0 record_result=0 edf_preopened=1 calibration_complete=1
+2026-06-13T17:04:01.849+08:00 STATUS formal_recording_start_requested participant=A030 success=1 edf=FM170308.EDF calibration_complete=1
+2026-06-13T17:04:01.849+08:00 STATUS start_ui_status sdk=connected host=connected log=../../../../../../Project/UE5/Gallery/Saved/ExperimentLogs/EyeLinkMarkers_20260613_165733_786.log
+2026-06-13T17:04:01.849+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=RECORDING_TIME_REFERENCE participant=A030 rel=350.967 unix=1781341441849 bjt=2026-06-13T17:04:01.849+08:00 source=ue_session_start
+2026-06-13T17:04:01.850+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=SESSION_START participant=A030 rel=350.967 unix=1781341441849 bjt=2026-06-13T17:04:01.849+08:00
+2026-06-13T17:04:01.850+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EXPERIMENT_RUN_MODE EXP1_THEN_EXP2
+2026-06-13T17:04:01.854+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=SCREEN_RECORDING_REQUEST enabled=1 started=1 participant=A030
+2026-06-13T17:05:00.644+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=TRIALID T001
+2026-06-13T17:05:00.645+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT LOADING_INTERACT trial=T001 rel=409.786 unix=1781341500669 bjt=2026-06-13T17:05:00.668+08:00
+2026-06-13T17:05:00.645+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT LOADING_START trial=T001 rel=409.786 unix=1781341500669 bjt=2026-06-13T17:05:00.668+08:00
+2026-06-13T17:05:00.645+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR participant A030
+2026-06-13T17:05:00.645+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR experiment EXP1
+2026-06-13T17:05:00.645+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR exhibit_id Ex1_TEST
+2026-06-13T17:05:00.646+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR exhibit_name 测试展品
+2026-06-13T17:05:00.646+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR condition A
+2026-06-13T17:05:00.646+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR latin_group NA
+2026-06-13T17:05:00.646+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR sequence_index -1
+2026-06-13T17:05:00.646+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR sequence_label NA
+2026-06-13T17:05:02.642+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT LOADING_COMPLETE trial=T001 rel=411.784 unix=1781341502666 bjt=2026-06-13T17:05:02.666+08:00
+2026-06-13T17:05:06.178+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT VIEWER_ENTER trial=T001 rel=415.318 unix=1781341506201 bjt=2026-06-13T17:05:06.200+08:00
+2026-06-13T17:05:06.179+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT QUESTION_START trial=T001 rel=415.318 unix=1781341506201 bjt=2026-06-13T17:05:06.200+08:00 q=1 total=2 correct_index=-1 correct_label=NotAnswered
+2026-06-13T17:05:11.634+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT QUESTION_SUBMIT trial=T001 rel=420.761 unix=1781341511643 bjt=2026-06-13T17:05:11.643+08:00 q=1 option=A correct_index=-1 correct_label=NotAnswered is_correct=-1
+2026-06-13T17:05:11.635+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT QUESTION_START trial=T001 rel=420.761 unix=1781341511643 bjt=2026-06-13T17:05:11.643+08:00 q=2 total=2 correct_index=-1 correct_label=NotAnswered
+2026-06-13T17:05:19.467+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT QUESTION_SUBMIT trial=T001 rel=428.595 unix=1781341519477 bjt=2026-06-13T17:05:19.476+08:00 q=2 option=B correct_index=-1 correct_label=NotAnswered is_correct=-1
+2026-06-13T17:05:21.497+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT VIEWER_EXIT trial=T001 rel=430.639 unix=1781341521522 bjt=2026-06-13T17:05:21.521+08:00
+2026-06-13T17:05:21.497+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT TRIAL_RESULT trial=T001 rel=430.639 unix=1781341521522 bjt=2026-06-13T17:05:21.521+08:00 rows=2
+2026-06-13T17:06:10.860+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=TRIALID T002
+2026-06-13T17:06:10.861+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT LOADING_INTERACT trial=T002 rel=480.004 unix=1781341570886 bjt=2026-06-13T17:06:10.885+08:00
+2026-06-13T17:06:10.861+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT LOADING_START trial=T002 rel=480.004 unix=1781341570886 bjt=2026-06-13T17:06:10.885+08:00
+2026-06-13T17:06:10.861+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR participant A030
+2026-06-13T17:06:10.861+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR experiment EXP1
+2026-06-13T17:06:10.862+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR exhibit_id 01
+2026-06-13T17:06:10.862+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR exhibit_name 半岛香炉
+2026-06-13T17:06:10.862+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR condition A_PLUS
+2026-06-13T17:06:10.862+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR latin_group G2
+2026-06-13T17:06:10.863+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR sequence_index 1
+2026-06-13T17:06:10.863+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR sequence_label G2_T01
+2026-06-13T17:06:20.856+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT LOADING_COMPLETE trial=T002 rel=489.998 unix=1781341580881 bjt=2026-06-13T17:06:20.880+08:00
+2026-06-13T17:06:27.598+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT VIEWER_ENTER trial=T002 rel=496.741 unix=1781341587623 bjt=2026-06-13T17:06:27.622+08:00
+2026-06-13T17:06:27.599+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT QUESTION_START trial=T002 rel=496.741 unix=1781341587623 bjt=2026-06-13T17:06:27.622+08:00 q=1 total=2 correct_index=1 correct_label=B
+2026-06-13T17:06:33.330+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT QUESTION_SUBMIT trial=T002 rel=502.458 unix=1781341593340 bjt=2026-06-13T17:06:33.340+08:00 q=1 option=B correct_index=1 correct_label=B is_correct=1
+2026-06-13T17:06:33.331+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT QUESTION_START trial=T002 rel=502.458 unix=1781341593340 bjt=2026-06-13T17:06:33.340+08:00 q=2 total=2 correct_index=1 correct_label=B
+2026-06-13T17:06:49.941+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT QUESTION_SUBMIT trial=T002 rel=519.068 unix=1781341609950 bjt=2026-06-13T17:06:49.950+08:00 q=2 option=A correct_index=1 correct_label=B is_correct=0
+2026-06-13T17:06:52.003+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT VIEWER_EXIT trial=T002 rel=521.145 unix=1781341612027 bjt=2026-06-13T17:06:52.027+08:00
+2026-06-13T17:06:52.003+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT TRIAL_RESULT trial=T002 rel=521.145 unix=1781341612027 bjt=2026-06-13T17:06:52.027+08:00 rows=2
+2026-06-13T17:08:25.567+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=TRIALID T003
+2026-06-13T17:08:25.568+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT LOADING_INTERACT trial=T003 rel=614.711 unix=1781341705593 bjt=2026-06-13T17:08:25.593+08:00
+2026-06-13T17:08:25.568+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT LOADING_START trial=T003 rel=614.711 unix=1781341705593 bjt=2026-06-13T17:08:25.593+08:00
+2026-06-13T17:08:25.568+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR participant A030
+2026-06-13T17:08:25.568+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR experiment EXP1
+2026-06-13T17:08:25.568+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR exhibit_id 02
+2026-06-13T17:08:25.568+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR exhibit_name 中国青铜器
+2026-06-13T17:08:25.568+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR condition B
+2026-06-13T17:08:25.569+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR latin_group G2
+2026-06-13T17:08:25.569+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR sequence_index 2
+2026-06-13T17:08:25.569+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR sequence_label G2_T02
+2026-06-13T17:08:35.561+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT LOADING_COMPLETE trial=T003 rel=624.704 unix=1781341715586 bjt=2026-06-13T17:08:35.586+08:00
+2026-06-13T17:08:37.766+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT VIEWER_ENTER trial=T003 rel=626.908 unix=1781341717790 bjt=2026-06-13T17:08:37.790+08:00
+2026-06-13T17:08:37.767+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT QUESTION_START trial=T003 rel=626.908 unix=1781341717790 bjt=2026-06-13T17:08:37.790+08:00 q=1 total=2 correct_index=1 correct_label=B
+2026-06-13T17:08:43.278+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT QUESTION_SUBMIT trial=T003 rel=632.405 unix=1781341723288 bjt=2026-06-13T17:08:43.287+08:00 q=1 option=B correct_index=1 correct_label=B is_correct=1
+2026-06-13T17:08:43.279+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT QUESTION_START trial=T003 rel=632.405 unix=1781341723288 bjt=2026-06-13T17:08:43.287+08:00 q=2 total=2 correct_index=1 correct_label=B
+2026-06-13T17:08:52.009+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT QUESTION_SUBMIT trial=T003 rel=641.135 unix=1781341732017 bjt=2026-06-13T17:08:52.017+08:00 q=2 option=B correct_index=1 correct_label=B is_correct=1
+2026-06-13T17:08:53.431+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT VIEWER_EXIT trial=T003 rel=642.572 unix=1781341733455 bjt=2026-06-13T17:08:53.454+08:00
+2026-06-13T17:08:53.432+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT TRIAL_RESULT trial=T003 rel=642.572 unix=1781341733455 bjt=2026-06-13T17:08:53.454+08:00 rows=2
+2026-06-13T17:10:05.459+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=TRIALID T004
+2026-06-13T17:10:05.460+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT LOADING_INTERACT trial=T004 rel=714.602 unix=1781341805485 bjt=2026-06-13T17:10:05.484+08:00
+2026-06-13T17:10:05.460+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT LOADING_START trial=T004 rel=714.602 unix=1781341805485 bjt=2026-06-13T17:10:05.484+08:00
+2026-06-13T17:10:05.460+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR participant A030
+2026-06-13T17:10:05.460+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR experiment EXP1
+2026-06-13T17:10:05.461+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR exhibit_id 03
+2026-06-13T17:10:05.461+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR exhibit_name 希腊陶具
+2026-06-13T17:10:05.461+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR condition C_MINUS
+2026-06-13T17:10:05.461+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR latin_group G2
+2026-06-13T17:10:05.461+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR sequence_index 3
+2026-06-13T17:10:05.461+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR sequence_label G2_T03
+2026-06-13T17:10:05.461+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT VIEWER_ENTER trial=T004 rel=714.602 unix=1781341805485 bjt=2026-06-13T17:10:05.484+08:00 mode=progressive_no_progress_bar
+2026-06-13T17:10:11.443+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT PROGRESSIVE_USABLE trial=T004 rel=720.586 unix=1781341811469 bjt=2026-06-13T17:10:11.468+08:00
+2026-06-13T17:10:11.444+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT QUESTION_START trial=T004 rel=720.586 unix=1781341811469 bjt=2026-06-13T17:10:11.468+08:00 q=1 total=2 correct_index=0 correct_label=A
+2026-06-13T17:10:14.652+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT QUESTION_SUBMIT trial=T004 rel=723.779 unix=1781341814661 bjt=2026-06-13T17:10:14.661+08:00 q=1 option=A correct_index=0 correct_label=A is_correct=1
+2026-06-13T17:10:14.652+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT QUESTION_START trial=T004 rel=723.779 unix=1781341814661 bjt=2026-06-13T17:10:14.661+08:00 q=2 total=2 correct_index=2 correct_label=C
+2026-06-13T17:10:15.458+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT LOADING_COMPLETE trial=T004 rel=724.602 unix=1781341815484 bjt=2026-06-13T17:10:15.483+08:00
+2026-06-13T17:10:17.434+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT QUESTION_SUBMIT trial=T004 rel=726.562 unix=1781341817444 bjt=2026-06-13T17:10:17.443+08:00 q=2 option=C correct_index=2 correct_label=C is_correct=1
+2026-06-13T17:10:19.494+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT VIEWER_EXIT trial=T004 rel=728.638 unix=1781341819520 bjt=2026-06-13T17:10:19.520+08:00
+2026-06-13T17:10:19.495+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT TRIAL_RESULT trial=T004 rel=728.638 unix=1781341819520 bjt=2026-06-13T17:10:19.520+08:00 rows=2
+2026-06-13T17:11:20.783+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=TRIALID T005
+2026-06-13T17:11:20.784+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT LOADING_INTERACT trial=T005 rel=789.928 unix=1781341880810 bjt=2026-06-13T17:11:20.809+08:00
+2026-06-13T17:11:20.785+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT LOADING_START trial=T005 rel=789.928 unix=1781341880810 bjt=2026-06-13T17:11:20.809+08:00
+2026-06-13T17:11:20.785+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR participant A030
+2026-06-13T17:11:20.785+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR experiment EXP1
+2026-06-13T17:11:20.785+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR exhibit_id 04
+2026-06-13T17:11:20.785+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR exhibit_name 中国花瓶
+2026-06-13T17:11:20.785+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR condition C
+2026-06-13T17:11:20.785+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR latin_group G2
+2026-06-13T17:11:20.785+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR sequence_index 4
+2026-06-13T17:11:20.786+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR sequence_label G2_T04
+2026-06-13T17:11:20.786+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT VIEWER_ENTER trial=T005 rel=789.928 unix=1781341880810 bjt=2026-06-13T17:11:20.809+08:00 mode=progressive
+2026-06-13T17:11:26.782+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT PROGRESSIVE_USABLE trial=T005 rel=795.926 unix=1781341886808 bjt=2026-06-13T17:11:26.807+08:00
+2026-06-13T17:11:26.784+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT QUESTION_START trial=T005 rel=795.926 unix=1781341886808 bjt=2026-06-13T17:11:26.807+08:00 q=1 total=2 correct_index=2 correct_label=C
+2026-06-13T17:11:30.775+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT LOADING_COMPLETE trial=T005 rel=799.919 unix=1781341890801 bjt=2026-06-13T17:11:30.801+08:00
+2026-06-13T17:11:32.236+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT QUESTION_SUBMIT trial=T005 rel=801.364 unix=1781341892246 bjt=2026-06-13T17:11:32.245+08:00 q=1 option=C correct_index=2 correct_label=C is_correct=1
+2026-06-13T17:11:32.236+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT QUESTION_START trial=T005 rel=801.364 unix=1781341892246 bjt=2026-06-13T17:11:32.245+08:00 q=2 total=2 correct_index=3 correct_label=D
+2026-06-13T17:11:39.015+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT QUESTION_SUBMIT trial=T005 rel=808.140 unix=1781341899022 bjt=2026-06-13T17:11:39.022+08:00 q=2 option=D correct_index=3 correct_label=D is_correct=1
+2026-06-13T17:11:40.564+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT VIEWER_EXIT trial=T005 rel=809.707 unix=1781341900589 bjt=2026-06-13T17:11:40.589+08:00
+2026-06-13T17:11:40.565+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT TRIAL_RESULT trial=T005 rel=809.707 unix=1781341900589 bjt=2026-06-13T17:11:40.589+08:00 rows=2
+2026-06-13T17:12:34.299+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=TRIALID T006
+2026-06-13T17:12:34.300+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT LOADING_INTERACT trial=T006 rel=863.442 unix=1781341954325 bjt=2026-06-13T17:12:34.324+08:00
+2026-06-13T17:12:34.300+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT LOADING_START trial=T006 rel=863.442 unix=1781341954325 bjt=2026-06-13T17:12:34.324+08:00
+2026-06-13T17:12:34.300+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR participant A030
+2026-06-13T17:12:34.300+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR experiment EXP1
+2026-06-13T17:12:34.300+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR exhibit_id 05
+2026-06-13T17:12:34.300+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR exhibit_name 雅典双耳罐
+2026-06-13T17:12:34.300+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR condition A
+2026-06-13T17:12:34.300+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR latin_group G2
+2026-06-13T17:12:34.300+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR sequence_index 5
+2026-06-13T17:12:34.301+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR sequence_label G2_T05
+2026-06-13T17:12:44.290+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT LOADING_COMPLETE trial=T006 rel=873.433 unix=1781341964316 bjt=2026-06-13T17:12:44.315+08:00
+2026-06-13T17:12:46.463+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT VIEWER_ENTER trial=T006 rel=875.604 unix=1781341966487 bjt=2026-06-13T17:12:46.486+08:00
+2026-06-13T17:12:46.464+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT QUESTION_START trial=T006 rel=875.604 unix=1781341966487 bjt=2026-06-13T17:12:46.486+08:00 q=1 total=2 correct_index=0 correct_label=A
+2026-06-13T17:12:51.071+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT QUESTION_SUBMIT trial=T006 rel=880.199 unix=1781341971081 bjt=2026-06-13T17:12:51.081+08:00 q=1 option=A correct_index=0 correct_label=A is_correct=1
+2026-06-13T17:12:51.073+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT QUESTION_START trial=T006 rel=880.199 unix=1781341971081 bjt=2026-06-13T17:12:51.081+08:00 q=2 total=2 correct_index=2 correct_label=C
+2026-06-13T17:12:55.148+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT QUESTION_SUBMIT trial=T006 rel=884.275 unix=1781341975157 bjt=2026-06-13T17:12:55.157+08:00 q=2 option=C correct_index=2 correct_label=C is_correct=1
+2026-06-13T17:12:56.129+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT VIEWER_EXIT trial=T006 rel=885.272 unix=1781341976155 bjt=2026-06-13T17:12:56.154+08:00
+2026-06-13T17:12:56.129+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT TRIAL_RESULT trial=T006 rel=885.272 unix=1781341976155 bjt=2026-06-13T17:12:56.154+08:00 rows=2
+2026-06-13T17:19:17.694+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=TRIALID Exp2_001
+2026-06-13T17:19:17.695+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR participant A030
+2026-06-13T17:19:17.695+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR experiment EXP2
+2026-06-13T17:19:17.695+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR condition E3_SPATIAL_NONPROGRESSIVE
+2026-06-13T17:19:17.695+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR spatial_continuity 1
+2026-06-13T17:19:17.695+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR progressive_availability 0
+2026-06-13T17:19:17.695+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR target_index 2
+2026-06-13T17:19:17.695+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR target_display_index 2
+2026-06-13T17:19:17.695+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR target_content_index 1
+2026-06-13T17:19:17.696+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR target_label 左脸
+2026-06-13T17:19:17.697+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR slot_permutation 1:4|2:1|3:2|4:3
+2026-06-13T17:19:17.697+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR sequence_group 3
+2026-06-13T17:19:17.697+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR sequence_index 1
+2026-06-13T17:19:17.698+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_LOADING_START trial_id=Exp2_001 rel=1266.835693 unix=1781342357718 bjt=2026-06-13T17:19:17.717+08:00 condition=E3_SPATIAL_NONPROGRESSIVE
+2026-06-13T17:19:29.681+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_001 rel=1278.823242 unix=1781342369706 bjt=2026-06-13T17:19:29.705+08:00 condition=E3_SPATIAL_NONPROGRESSIVE object_index=1 previous_stage=0 new_stage=3 progress=1.000000 object_stages=1:3|2:0|3
+2026-06-13T17:19:29.682+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_STAGE_3_START trial_id=Exp2_001 rel=1278.823242 unix=1781342369706 bjt=2026-06-13T17:19:29.705+08:00 condition=E3_SPATIAL_NONPROGRESSIVE stage=3 first_object_index=1 progress=1.000000 object_stages=1:3|2:0|3:0|4:0
+2026-06-13T17:19:29.682+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_001 rel=1278.823242 unix=1781342369706 bjt=2026-06-13T17:19:29.705+08:00 condition=E3_SPATIAL_NONPROGRESSIVE object_index=2 previous_stage=0 new_stage=3 progress=1.000000 object_stages=1:3|2:3|3
+2026-06-13T17:19:29.683+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_001 rel=1278.823242 unix=1781342369706 bjt=2026-06-13T17:19:29.705+08:00 condition=E3_SPATIAL_NONPROGRESSIVE object_index=3 previous_stage=0 new_stage=3 progress=1.000000 object_stages=1:3|2:3|3
+2026-06-13T17:19:29.684+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_001 rel=1278.823242 unix=1781342369706 bjt=2026-06-13T17:19:29.705+08:00 condition=E3_SPATIAL_NONPROGRESSIVE object_index=4 previous_stage=0 new_stage=3 progress=1.000000 object_stages=1:3|2:3|3
+2026-06-13T17:19:29.684+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_LOADING_COMPLETE trial_id=Exp2_001 rel=1278.823242 unix=1781342369706 bjt=2026-06-13T17:19:29.705+08:00 condition=E3_SPATIAL_NONPROGRESSIVE
+2026-06-13T17:20:00.316+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_PENDING_SELECTION trial_id=Exp2_001 rel=1309.458984 unix=1781342400341 bjt=2026-06-13T17:20:00.341+08:00 condition=E3_SPATIAL_NONPROGRESSIVE selected=2 selected_content=1 changes=1
+2026-06-13T17:20:06.710+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_SUBMIT_SELECTION trial_id=Exp2_001 rel=1315.853149 unix=1781342406735 bjt=2026-06-13T17:20:06.735+08:00 condition=E3_SPATIAL_NONPROGRESSIVE selected=2 selected_content=1 correct=1
+2026-06-13T17:20:06.711+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=TRIAL_RESULT Exp2_001 selected=2 correct=1
+2026-06-13T17:21:30.081+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=TRIALID Exp2_002
+2026-06-13T17:21:30.082+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR participant A030
+2026-06-13T17:21:30.082+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR experiment EXP2
+2026-06-13T17:21:30.082+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR condition E4_FIXED_NONPROGRESSIVE
+2026-06-13T17:21:30.082+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR spatial_continuity 0
+2026-06-13T17:21:30.083+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR progressive_availability 0
+2026-06-13T17:21:30.083+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR target_index 1
+2026-06-13T17:21:30.083+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR target_display_index 1
+2026-06-13T17:21:30.083+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR target_content_index 2
+2026-06-13T17:21:30.083+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR target_label 右脸
+2026-06-13T17:21:30.083+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR slot_permutation 1:2|2:1|3:3|4:4
+2026-06-13T17:21:30.083+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR sequence_group 3
+2026-06-13T17:21:30.084+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR sequence_index 2
+2026-06-13T17:21:30.084+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_LOADING_START trial_id=Exp2_002 rel=1399.175537 unix=1781342490058 bjt=2026-06-13T17:21:30.057+08:00 condition=E4_FIXED_NONPROGRESSIVE
+2026-06-13T17:21:42.063+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_002 rel=1411.157837 unix=1781342502040 bjt=2026-06-13T17:21:42.040+08:00 condition=E4_FIXED_NONPROGRESSIVE object_index=1 previous_stage=0 new_stage=3 progress=1.000000 object_stages=1:3|2:0|3:0
+2026-06-13T17:21:42.064+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_STAGE_3_START trial_id=Exp2_002 rel=1411.157837 unix=1781342502040 bjt=2026-06-13T17:21:42.040+08:00 condition=E4_FIXED_NONPROGRESSIVE stage=3 first_object_index=1 progress=1.000000 object_stages=1:3|2:0|3:0|4:0
+2026-06-13T17:21:42.064+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_002 rel=1411.157837 unix=1781342502040 bjt=2026-06-13T17:21:42.040+08:00 condition=E4_FIXED_NONPROGRESSIVE object_index=2 previous_stage=0 new_stage=3 progress=1.000000 object_stages=1:3|2:3|3:0
+2026-06-13T17:21:42.065+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_002 rel=1411.157837 unix=1781342502040 bjt=2026-06-13T17:21:42.040+08:00 condition=E4_FIXED_NONPROGRESSIVE object_index=3 previous_stage=0 new_stage=3 progress=1.000000 object_stages=1:3|2:3|3:3
+2026-06-13T17:21:42.065+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_002 rel=1411.157837 unix=1781342502040 bjt=2026-06-13T17:21:42.040+08:00 condition=E4_FIXED_NONPROGRESSIVE object_index=4 previous_stage=0 new_stage=3 progress=1.000000 object_stages=1:3|2:3|3:3
+2026-06-13T17:21:42.066+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_LOADING_COMPLETE trial_id=Exp2_002 rel=1411.157837 unix=1781342502040 bjt=2026-06-13T17:21:42.040+08:00 condition=E4_FIXED_NONPROGRESSIVE
+2026-06-13T17:21:49.225+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_PENDING_SELECTION trial_id=Exp2_002 rel=1418.320190 unix=1781342509202 bjt=2026-06-13T17:21:49.202+08:00 condition=E4_FIXED_NONPROGRESSIVE selected=1 selected_content=2 changes=1
+2026-06-13T17:21:52.950+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_SUBMIT_SELECTION trial_id=Exp2_002 rel=1422.044189 unix=1781342512926 bjt=2026-06-13T17:21:52.926+08:00 condition=E4_FIXED_NONPROGRESSIVE selected=1 selected_content=2 correct=1
+2026-06-13T17:21:52.951+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=TRIAL_RESULT Exp2_002 selected=1 correct=1
+2026-06-13T17:22:52.849+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=TRIALID Exp2_003
+2026-06-13T17:22:52.849+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR participant A030
+2026-06-13T17:22:52.849+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR experiment EXP2
+2026-06-13T17:22:52.849+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR condition E2_FIXED_PROGRESSIVE
+2026-06-13T17:22:52.849+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR spatial_continuity 0
+2026-06-13T17:22:52.849+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR progressive_availability 1
+2026-06-13T17:22:52.850+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR target_index 4
+2026-06-13T17:22:52.850+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR target_display_index 4
+2026-06-13T17:22:52.850+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR target_content_index 3
+2026-06-13T17:22:52.850+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR target_label 脖子
+2026-06-13T17:22:52.851+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR slot_permutation 1:2|2:4|3:1|4:3
+2026-06-13T17:22:52.851+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR sequence_group 3
+2026-06-13T17:22:52.851+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR sequence_index 3
+2026-06-13T17:22:52.851+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_LOADING_START trial_id=Exp2_003 rel=1481.943115 unix=1781342572825 bjt=2026-06-13T17:22:52.825+08:00 condition=E2_FIXED_PROGRESSIVE
+2026-06-13T17:22:56.844+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_003 rel=1485.939209 unix=1781342576822 bjt=2026-06-13T17:22:56.821+08:00 condition=E2_FIXED_PROGRESSIVE object_index=1 previous_stage=0 new_stage=1 progress=0.334662 object_stages=1:1|2:0|3:0|4:
+2026-06-13T17:22:56.845+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_STAGE_1_START trial_id=Exp2_003 rel=1485.939209 unix=1781342576822 bjt=2026-06-13T17:22:56.821+08:00 condition=E2_FIXED_PROGRESSIVE stage=1 first_object_index=1 progress=0.334662 object_stages=1:1|2:0|3:0|4:0
+2026-06-13T17:22:56.845+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_003 rel=1485.939209 unix=1781342576822 bjt=2026-06-13T17:22:56.821+08:00 condition=E2_FIXED_PROGRESSIVE object_index=2 previous_stage=0 new_stage=1 progress=0.334662 object_stages=1:1|2:1|3:0|4:
+2026-06-13T17:22:56.846+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_003 rel=1485.939209 unix=1781342576822 bjt=2026-06-13T17:22:56.821+08:00 condition=E2_FIXED_PROGRESSIVE object_index=3 previous_stage=0 new_stage=1 progress=0.334662 object_stages=1:1|2:1|3:1|4:
+2026-06-13T17:22:56.846+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_003 rel=1485.939209 unix=1781342576822 bjt=2026-06-13T17:22:56.821+08:00 condition=E2_FIXED_PROGRESSIVE object_index=4 previous_stage=0 new_stage=1 progress=0.334662 object_stages=1:1|2:1|3:1|4:
+2026-06-13T17:22:58.835+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_003 rel=1487.929810 unix=1781342578812 bjt=2026-06-13T17:22:58.812+08:00 condition=E2_FIXED_PROGRESSIVE object_index=1 previous_stage=1 new_stage=2 progress=0.500552 object_stages=1:2|2:1|3:1|4:
+2026-06-13T17:22:58.835+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_STAGE_2_START trial_id=Exp2_003 rel=1487.929810 unix=1781342578812 bjt=2026-06-13T17:22:58.812+08:00 condition=E2_FIXED_PROGRESSIVE stage=2 first_object_index=1 progress=0.500552 object_stages=1:2|2:1|3:1|4:1
+2026-06-13T17:22:58.836+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_003 rel=1487.929810 unix=1781342578812 bjt=2026-06-13T17:22:58.812+08:00 condition=E2_FIXED_PROGRESSIVE object_index=2 previous_stage=1 new_stage=2 progress=0.500552 object_stages=1:2|2:2|3:1|4:
+2026-06-13T17:22:58.836+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_003 rel=1487.929810 unix=1781342578812 bjt=2026-06-13T17:22:58.812+08:00 condition=E2_FIXED_PROGRESSIVE object_index=3 previous_stage=1 new_stage=2 progress=0.500552 object_stages=1:2|2:2|3:2|4:
+2026-06-13T17:22:58.837+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_003 rel=1487.929810 unix=1781342578812 bjt=2026-06-13T17:22:58.812+08:00 condition=E2_FIXED_PROGRESSIVE object_index=4 previous_stage=1 new_stage=2 progress=0.500552 object_stages=1:2|2:2|3:2|4:
+2026-06-13T17:22:58.837+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_PROGRESSIVE_USABLE trial_id=Exp2_003 rel=1487.929810 unix=1781342578812 bjt=2026-06-13T17:22:58.812+08:00 condition=E2_FIXED_PROGRESSIVE target_display_index=4 target_content_index=3 target_label=脖子 stage=2 progress=0.500552
+2026-06-13T17:23:04.843+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_003 rel=1493.938843 unix=1781342584821 bjt=2026-06-13T17:23:04.821+08:00 condition=E2_FIXED_PROGRESSIVE object_index=1 previous_stage=2 new_stage=3 progress=1.000000 object_stages=1:3|2:2|3:2|4:
+2026-06-13T17:23:04.844+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_STAGE_3_START trial_id=Exp2_003 rel=1493.938843 unix=1781342584821 bjt=2026-06-13T17:23:04.821+08:00 condition=E2_FIXED_PROGRESSIVE stage=3 first_object_index=1 progress=1.000000 object_stages=1:3|2:2|3:2|4:2
+2026-06-13T17:23:04.844+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_003 rel=1493.938843 unix=1781342584821 bjt=2026-06-13T17:23:04.821+08:00 condition=E2_FIXED_PROGRESSIVE object_index=2 previous_stage=2 new_stage=3 progress=1.000000 object_stages=1:3|2:3|3:2|4:
+2026-06-13T17:23:04.845+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_003 rel=1493.938843 unix=1781342584821 bjt=2026-06-13T17:23:04.821+08:00 condition=E2_FIXED_PROGRESSIVE object_index=3 previous_stage=2 new_stage=3 progress=1.000000 object_stages=1:3|2:3|3:3|4:
+2026-06-13T17:23:04.845+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_003 rel=1493.938843 unix=1781342584821 bjt=2026-06-13T17:23:04.821+08:00 condition=E2_FIXED_PROGRESSIVE object_index=4 previous_stage=2 new_stage=3 progress=1.000000 object_stages=1:3|2:3|3:3|4:
+2026-06-13T17:23:04.846+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_LOADING_COMPLETE trial_id=Exp2_003 rel=1493.938843 unix=1781342584821 bjt=2026-06-13T17:23:04.821+08:00 condition=E2_FIXED_PROGRESSIVE
+2026-06-13T17:23:06.613+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_PENDING_SELECTION trial_id=Exp2_003 rel=1495.707886 unix=1781342586590 bjt=2026-06-13T17:23:06.590+08:00 condition=E2_FIXED_PROGRESSIVE selected=4 selected_content=3 changes=1
+2026-06-13T17:23:09.062+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_SUBMIT_SELECTION trial_id=Exp2_003 rel=1498.156860 unix=1781342589039 bjt=2026-06-13T17:23:09.039+08:00 condition=E2_FIXED_PROGRESSIVE selected=4 selected_content=3 correct=1
+2026-06-13T17:23:09.063+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=TRIAL_RESULT Exp2_003 selected=4 correct=1
+2026-06-13T17:24:13.287+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=TRIALID Exp2_004
+2026-06-13T17:24:13.287+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR participant A030
+2026-06-13T17:24:13.288+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR experiment EXP2
+2026-06-13T17:24:13.288+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR condition E1_SPATIAL_PROGRESSIVE
+2026-06-13T17:24:13.288+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR spatial_continuity 1
+2026-06-13T17:24:13.288+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR progressive_availability 1
+2026-06-13T17:24:13.288+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR target_index 3
+2026-06-13T17:24:13.288+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR target_display_index 3
+2026-06-13T17:24:13.289+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR target_content_index 4
+2026-06-13T17:24:13.289+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR target_label 头顶
+2026-06-13T17:24:13.289+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR slot_permutation 1:3|2:1|3:4|4:2
+2026-06-13T17:24:13.289+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR sequence_group 3
+2026-06-13T17:24:13.289+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=!V TRIAL_VAR sequence_index 4
+2026-06-13T17:24:13.289+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_LOADING_START trial_id=Exp2_004 rel=1562.381348 unix=1781342653264 bjt=2026-06-13T17:24:13.263+08:00 condition=E1_SPATIAL_PROGRESSIVE
+2026-06-13T17:24:17.285+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_004 rel=1566.379272 unix=1781342657262 bjt=2026-06-13T17:24:17.261+08:00 condition=E1_SPATIAL_PROGRESSIVE object_index=1 previous_stage=0 new_stage=1 progress=0.334903 object_stages=1:1|2:0|3:0|
+2026-06-13T17:24:17.285+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_STAGE_1_START trial_id=Exp2_004 rel=1566.379272 unix=1781342657262 bjt=2026-06-13T17:24:17.261+08:00 condition=E1_SPATIAL_PROGRESSIVE stage=1 first_object_index=1 progress=0.334903 object_stages=1:1|2:0|3:0|4:0
+2026-06-13T17:24:17.286+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_004 rel=1566.379272 unix=1781342657262 bjt=2026-06-13T17:24:17.261+08:00 condition=E1_SPATIAL_PROGRESSIVE object_index=2 previous_stage=0 new_stage=1 progress=0.334903 object_stages=1:1|2:1|3:0|
+2026-06-13T17:24:17.286+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_004 rel=1566.379272 unix=1781342657262 bjt=2026-06-13T17:24:17.261+08:00 condition=E1_SPATIAL_PROGRESSIVE object_index=3 previous_stage=0 new_stage=1 progress=0.334903 object_stages=1:1|2:1|3:1|
+2026-06-13T17:24:17.287+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_004 rel=1566.379272 unix=1781342657262 bjt=2026-06-13T17:24:17.261+08:00 condition=E1_SPATIAL_PROGRESSIVE object_index=4 previous_stage=0 new_stage=1 progress=0.334903 object_stages=1:1|2:1|3:1|
+2026-06-13T17:24:19.282+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_004 rel=1568.376465 unix=1781342659259 bjt=2026-06-13T17:24:19.258+08:00 condition=E1_SPATIAL_PROGRESSIVE object_index=1 previous_stage=1 new_stage=2 progress=0.501340 object_stages=1:2|2:1|3:1|
+2026-06-13T17:24:19.282+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_STAGE_2_START trial_id=Exp2_004 rel=1568.376465 unix=1781342659259 bjt=2026-06-13T17:24:19.258+08:00 condition=E1_SPATIAL_PROGRESSIVE stage=2 first_object_index=1 progress=0.501340 object_stages=1:2|2:1|3:1|4:1
+2026-06-13T17:24:19.283+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_004 rel=1568.376465 unix=1781342659259 bjt=2026-06-13T17:24:19.258+08:00 condition=E1_SPATIAL_PROGRESSIVE object_index=2 previous_stage=1 new_stage=2 progress=0.501340 object_stages=1:2|2:2|3:1|
+2026-06-13T17:24:19.283+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_004 rel=1568.376465 unix=1781342659259 bjt=2026-06-13T17:24:19.258+08:00 condition=E1_SPATIAL_PROGRESSIVE object_index=3 previous_stage=1 new_stage=2 progress=0.501340 object_stages=1:2|2:2|3:2|
+2026-06-13T17:24:19.284+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_PROGRESSIVE_USABLE trial_id=Exp2_004 rel=1568.376465 unix=1781342659259 bjt=2026-06-13T17:24:19.258+08:00 condition=E1_SPATIAL_PROGRESSIVE target_display_index=3 target_content_index=4 target_label=头顶 stage=2 progress=0.501340
+2026-06-13T17:24:19.284+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_004 rel=1568.376465 unix=1781342659259 bjt=2026-06-13T17:24:19.258+08:00 condition=E1_SPATIAL_PROGRESSIVE object_index=4 previous_stage=1 new_stage=2 progress=0.501340 object_stages=1:2|2:2|3:2|
+2026-06-13T17:24:25.272+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_004 rel=1574.366821 unix=1781342665249 bjt=2026-06-13T17:24:25.249+08:00 condition=E1_SPATIAL_PROGRESSIVE object_index=1 previous_stage=2 new_stage=3 progress=1.000000 object_stages=1:3|2:2|3:2|
+2026-06-13T17:24:25.273+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_STAGE_3_START trial_id=Exp2_004 rel=1574.366821 unix=1781342665249 bjt=2026-06-13T17:24:25.249+08:00 condition=E1_SPATIAL_PROGRESSIVE stage=3 first_object_index=1 progress=1.000000 object_stages=1:3|2:2|3:2|4:2
+2026-06-13T17:24:25.274+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_004 rel=1574.366821 unix=1781342665249 bjt=2026-06-13T17:24:25.249+08:00 condition=E1_SPATIAL_PROGRESSIVE object_index=2 previous_stage=2 new_stage=3 progress=1.000000 object_stages=1:3|2:3|3:2|
+2026-06-13T17:24:25.275+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_004 rel=1574.366821 unix=1781342665249 bjt=2026-06-13T17:24:25.249+08:00 condition=E1_SPATIAL_PROGRESSIVE object_index=3 previous_stage=2 new_stage=3 progress=1.000000 object_stages=1:3|2:3|3:3|
+2026-06-13T17:24:25.275+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_OBJECT_STAGE_CHANGED trial_id=Exp2_004 rel=1574.366821 unix=1781342665249 bjt=2026-06-13T17:24:25.249+08:00 condition=E1_SPATIAL_PROGRESSIVE object_index=4 previous_stage=2 new_stage=3 progress=1.000000 object_stages=1:3|2:3|3:3|
+2026-06-13T17:24:25.275+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_LOADING_COMPLETE trial_id=Exp2_004 rel=1574.366821 unix=1781342665249 bjt=2026-06-13T17:24:25.249+08:00 condition=E1_SPATIAL_PROGRESSIVE
+2026-06-13T17:24:26.546+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_PENDING_SELECTION trial_id=Exp2_004 rel=1575.640137 unix=1781342666522 bjt=2026-06-13T17:24:26.522+08:00 condition=E1_SPATIAL_PROGRESSIVE selected=3 selected_content=4 changes=1
+2026-06-13T17:24:30.819+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXP2_SUBMIT_SELECTION trial_id=Exp2_004 rel=1579.913940 unix=1781342670796 bjt=2026-06-13T17:24:30.796+08:00 condition=E1_SPATIAL_PROGRESSIVE selected=3 selected_content=4 correct=1
+2026-06-13T17:24:30.819+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=TRIAL_RESULT Exp2_004 selected=3 correct=1
+2026-06-13T17:25:51.717+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=EVENT EXPERIMENT_END_SCREEN_SHOWN participant=A030 unix=1781342751716 bjt=2026-06-13_17:25:51.716
+2026-06-13T17:25:51.717+08:00 FORMAL_RECORDING step=FINISH_REQUESTED success=1 reason=experiment_end_door edf=FM170308.EDF recording=1 opened=1
+2026-06-13T17:25:51.717+08:00 MARKER sdk=1 host=1 enabled=1 sent=1 result=0 message=FORMAL_RECORDING_END participant=A030 rel=1660.811 unix=1781342751717 bjt=2026-06-13T17:25:51.717+08:00 edf=FM170308.EDF source=ue_formal reason=experiment_end_door
+2026-06-13T17:25:51.823+08:00 FORMAL_RECORDING step=RECORDING_STOPPED success=1 result=0
+2026-06-13T17:25:51.823+08:00 FORMAL_RECORDING step=EDF_CLOSED success=1 edf=FM170308.EDF result=0
+2026-06-13T17:25:54.356+08:00 EDF_RECEIVE_ATTEMPT source_tag=formal attempt=full_path source=FM170308.EDF dest=../../../../../../Project/UE5/Gallery/Saved/ExperimentData/EDF/FM170308.EDF dest_is_path=0 result=72322813 exists=1 size=72322813
+2026-06-13T17:25:54.356+08:00 FORMAL_RECORDING step=EDF_RECEIVED_TO_DPC success=1 edf=FM170308.EDF local=../../../../../../Project/UE5/Gallery/Saved/ExperimentData/EDF/FM170308.EDF result=72322813 size=72322813
+2026-06-13T17:25:54.357+08:00 FORMAL_RECORDING step=FINISHED success=1 reason=experiment_end_door edf=FM170308.EDF local=../../../../../../Project/UE5/Gallery/Saved/ExperimentData/EDF/FM170308.EDF
