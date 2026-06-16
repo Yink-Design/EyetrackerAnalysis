@@ -8,3 +8,7 @@ latest_eyelink_marker_log,../../../../../../Project/UE5/Gallery/Saved/Experiment
 screen_recording_log,../../../../../../Project/UE5/Gallery/Saved/ScreenRecordings/ScreenRecordingLog.csv,../../../../../../Project/UE5/Gallery/Saved/ExperimentData/Participants/A017_2/Logs/ScreenRecordingLog.csv,1,copied
 screen_recording,../../../../../../Project/UE5/Gallery/Saved/ScreenRecordings/A017_2_20260612_201316_screen.mkv,../../../../../../Project/UE5/Gallery/Saved/ExperimentData/Participants/A017_2/ScreenRecordings/A017_2_20260612_201316_screen.mkv,1,copied
 latest_screen_recording_fallback,../../../../../../Project/UE5/Gallery/Saved/ScreenRecordings/A017_2_20260612_201316_screen.mkv,../../../../../../Project/UE5/Gallery/Saved/ExperimentData/Participants/A017_2/ScreenRecordings/A017_2_20260612_201316_screen.mkv,1,copied
+recovered_exp01_csv,data/Add/A017_exp01_InspectQuestionResults.csv,data/FMdata/A017_2/CSV/A017_2_exp01_InspectQuestionResults.csv,1,recovered_from_data_Add
+recovered_exp01_dynamic_aoi,data/Add/A017_DynamicAOI.csv,data/FMdata/A017_2/AOI/A017_2_exp01_DynamicAOI.csv,1,recovered_from_data_Add
+recovered_exp01_edf,data/Add/FM194948.EDF,data/FMdata/A017_2/EDF/FM194948.EDF,1,recovered_from_data_Add
+recovered_exp01_asc,data/Add/FM194948.asc,data/FMdata/A017_2/EDF/FM194948.asc,1,recovered_from_data_Add

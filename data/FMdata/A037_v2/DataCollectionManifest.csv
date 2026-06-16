@@ -1,0 +1,13 @@
+Type,Source,Destination,Success,Note
+participant_csv,../../../../../../Project/UE5/Gallery/Saved/ExperimentData/A037_v2_exp02_Experiment2Results.csv,../../../../../../Project/UE5/Gallery/Saved/ExperimentData/Participants/A037_v2/CSV/A037_v2_exp02_Experiment2Results.csv,1,copied
+experiment_end_csv_filtered,../../../../../../Project/UE5/Gallery/Saved/ExperimentData/ExperimentEndEvents.csv,../../../../../../Project/UE5/Gallery/Saved/ExperimentData/Participants/A037_v2/CSV/A037_v2_ExperimentEndEvent.csv,1,filtered_rows_1
+dynamic_aoi,../../../../../../Project/UE5/Gallery/Saved/EyeTrackingAOI/A037_v2_DynamicAOI.csv,../../../../../../Project/UE5/Gallery/Saved/ExperimentData/Participants/A037_v2/AOI/A037_v2_DynamicAOI.csv,1,copied
+formal_edf,../../../../../../Project/UE5/Gallery/Saved/ExperimentData/EDF/FM203033.EDF,../../../../../../Project/UE5/Gallery/Saved/ExperimentData/Participants/A037_v2/EDF/FM203033.EDF,1,copied
+latest_edf_fallback,../../../../../../Project/UE5/Gallery/Saved/ExperimentData/EDF/FM203033.EDF,../../../../../../Project/UE5/Gallery/Saved/ExperimentData/Participants/A037_v2/EDF/FM203033.EDF,1,copied
+latest_eyelink_marker_log,../../../../../../Project/UE5/Gallery/Saved/ExperimentLogs/EyeLinkMarkers_20260616_202922_036.log,../../../../../../Project/UE5/Gallery/Saved/ExperimentData/Participants/A037_v2/Logs/EyeLinkMarkers_20260616_202922_036.log,1,copied
+screen_recording_log,../../../../../../Project/UE5/Gallery/Saved/ScreenRecordings/ScreenRecordingLog.csv,../../../../../../Project/UE5/Gallery/Saved/ExperimentData/Participants/A037_v2/Logs/ScreenRecordingLog.csv,1,copied
+screen_recording,../../../../../../Project/UE5/Gallery/Saved/ScreenRecordings/A037_v2_20260616_203154_screen.mkv,../../../../../../Project/UE5/Gallery/Saved/ExperimentData/Participants/A037_v2/ScreenRecordings/A037_v2_20260616_203154_screen.mkv,1,copied
+latest_screen_recording_fallback,../../../../../../Project/UE5/Gallery/Saved/ScreenRecordings/A037_v2_20260616_203154_screen.mkv,../../../../../../Project/UE5/Gallery/Saved/ExperimentData/Participants/A037_v2/ScreenRecordings/A037_v2_20260616_203154_screen.mkv,1,copied
+recovered_exp01_csv,data/Add/A037/A037_exp01_InspectQuestionResults.csv,data/FMdata/A037_v2/CSV/A037_v2_exp01_InspectQuestionResults.csv,1,recovered_from_data_Add
+recovered_exp01_dynamic_aoi,data/Add/A037/A037_DynamicAOI.csv,data/FMdata/A037_v2/AOI/A037_v2_exp01_DynamicAOI.csv,1,recovered_from_data_Add
+recovered_exp01_marker_log,data/Add/A037/EyeLinkMarkers_20260616_195915_842.log,data/FMdata/A037_v2/Logs/EyeLinkMarkers_20260616_195915_842_recovered_exp01.log,1,recovered_from_data_Add
