@@ -3,3 +3,6 @@ shiny_stdout.log
 shiny_stderr.log
 outputs/*
 !outputs/.gitkeep
+
+# Local screen recordings
+*.mkv
